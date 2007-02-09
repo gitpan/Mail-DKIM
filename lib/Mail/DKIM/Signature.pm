@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Copyright 2005 Messiah College. All rights reserved.
+# Copyright 2005-2006 Messiah College. All rights reserved.
 # Jason Long <jlong@messiah.edu>
 
 # Copyright (c) 2004 Anthony D. Urso. All rights reserved.
@@ -11,6 +11,8 @@ use strict;
 use warnings;
 
 use Mail::DKIM::PublicKey;
+use Mail::DKIM::Algorithm::rsa_sha1;
+use Mail::DKIM::Algorithm::rsa_sha256;
 
 package Mail::DKIM::Signature;
 use base "Mail::DKIM::KeyValueList";
@@ -27,7 +29,7 @@ Mail::DKIM::Signature - encapsulates a DKIM signature header
   my $signature = new Mail::DKIM::Signature(
                       [ Algorithm => "rsa-sha1", ]
                       [ Signature => $base64, ]
-                      [ Method => "nowsp", ]
+                      [ Method => "relaxed", ]
                       [ Domain => "example.org", ]
                       [ Headers => "from:subject:date:message-id", ]
                       [ Query => "dns", ]
@@ -42,12 +44,14 @@ sub new {
 	my $self = {};
 	bless $self, $type;
 
+	#$self->version("0.5");
 	$self->algorithm($prms{'Algorithm'} || "rsa-sha1");
 	$self->signature($prms{'Signature'});
-	$self->method($prms{'Method'} || "simple");
+	$self->canonicalization($prms{'Method'} || "simple");
 	$self->domain($prms{'Domain'});
 	$self->headerlist($prms{'Headers'});
 	$self->protocol($prms{'Query'} || "dns");
+	#$self->protocol($prms{'Query'} || "dns/txt");
 	$self->selector($prms{'Selector'});
 
 	return $self;
@@ -56,7 +60,7 @@ sub new {
 =head2 parse() - create a new signature from a DKIM-Signature header
 
   my $sig = parse Mail::DKIM::Signature(
-                  "DKIM-Signature: a=rsa-sha1; b=yluiJ7+0=; c=nowsp"
+                  "DKIM-Signature: a=rsa-sha1; b=yluiJ7+0=; c=relaxed"
             );
 
 Constructs a signature by parsing the provided DKIM-Signature header
@@ -91,9 +95,14 @@ sub parse
 	my $self = $class->SUPER::parse($string);
 	$self->{prefix} = $prefix;
 
-	if (defined $self->get_tag("v"))
+	# TODO: check version
+	if (my $version = $self->version)
 	{
-		die "detected forbidden v= tag\n";
+		my @ALLOWED_VERSIONS = ("0.5");
+		unless (grep {$_ eq $version} @ALLOWED_VERSIONS)
+		{
+			die "unsupported v=$version tag\n";
+		}
 	}
 
 	return $self;
@@ -147,7 +156,7 @@ sub algorithm
 
 outputs
 
-  DKIM-Signature: a=rsa-sha1; b=yluiJ7+0=; c=nowsp
+  DKIM-Signature: a=rsa-sha1; b=yluiJ7+0=; c=relaxed
 
 As shown in the example, the as_string method can be used to generate
 the DKIM-Signature that gets prepended to a signed message.
@@ -179,7 +188,7 @@ sub as_string_debug
 
 outputs
 
-  DKIM-Signature: a=rsa-sha1; b=; c=nowsp
+  DKIM-Signature: a=rsa-sha1; b=; c=relaxed
 
 This is similar to the as_string() method, but it always excludes the "data"
 part. This is used by the DKIM canonicalization methods, which require
@@ -352,13 +361,49 @@ sub check_canonicalization
 	return 1;
 }
 
+# checks whether the protocol found on this subject is valid for
+# fetching the public key
+# returns a true value if protocol is "dns/txt", false otherwise
+#
 sub check_protocol
 {
 	my $self = shift;
 
 	my ($type, $options) = split(/\//, $self->protocol, 2);
-	return ($type eq "dns");
+	return unless ($type eq "dns");
+	return if ($options && $options ne "txt");
+
+	my $v = $self->version;
+	if ($v && $v eq "0.5")
+	{
+		# in v=0.5 signatures, the /txt option is REQUIRED
+		return unless ($options && $options eq "txt");
+	}
+	return 1;
 }
+
+# allows the type of signature to determine what "algorithm" gets used
+sub get_algorithm_class
+{
+	my $self = shift;
+	croak "wrong number of arguments" unless (@_ == 1);
+	my ($algorithm) = @_;
+
+	my $class =
+		$algorithm eq "rsa-sha1" ? "Mail::DKIM::Algorithm::rsa_sha1" :
+		$algorithm eq "rsa-sha256" ? "Mail::DKIM::Algorithm::rsa_sha256" :
+		undef;
+	return $class;
+}
+
+=head2 get_public_key() - fetches the public key referenced by this signature
+
+  my $pubkey = $signature->get_public_key;
+
+Public key to fetch is determined by the protocol, selector, and domain
+fields.
+
+=cut
 
 sub get_public_key
 {
@@ -413,8 +458,18 @@ sub hash_algorithm
 
 =head2 headerlist() - get or set the signed header fields (h=) field
 
+  $signature->headerlist("a:b:c");
+
+  my $headerlist = $signature->headerlist;
+
+  my @headers = $signature->headerlist;
+
 Signed header fields. A colon-separated list of header field names
 that identify the header fields presented to the signing algorithm.
+
+In scalar context, the list of header field names will be returned
+as a single string, with the names joined together with colons.
+In list context, the header field names will be returned as a list.
 
 =cut
 
@@ -437,6 +492,10 @@ sub headerlist
 		my @list = split /:/, $h;
 		@list = map { s/^\s+|\s+$//g; $_ } @list;
 		return @list;
+	}
+	elsif (wantarray)
+	{
+		return ();
 	}
 
 	return $h;
@@ -540,14 +599,17 @@ sub selector {
 	return $self->get_tag("s");
 }	
 
-=head2 signature() - get or set the signature data (b=) field
+=head2 data() - get or set the signature data (b=) field
+
+  my $base64 = $signature->data;
+  $signature->data($base64);
 
 The signature data. Whitespace is automatically stripped from the
-returned value.
+returned value. The data is Base64-encoded.
 
 =cut
 
-sub signature
+sub data
 {
 	my $self = shift;
 
@@ -563,6 +625,8 @@ sub signature
 	}
 	return $b;
 }	
+
+*signature = \*data;
 
 =head2 timestamp() - get or set the signature timestamp (t=) field
 
@@ -581,5 +645,36 @@ sub timestamp
 	
 	return $self->get_tag("t");
 }
+
+=head2 version() - get or set the DKIM specification version (v=) field
+
+This is the version of the DKIM specification that applies to this
+signature record.
+
+=cut
+
+sub version
+{
+	my $self = shift;
+
+	(@_) and
+		$self->set_tag("v", shift);
+
+	return $self->get_tag("v");
+}
+
+=head1 AUTHOR
+
+Jason Long, E<lt>jlong@messiah.eduE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2006 by Messiah College
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.6 or,
+at your option, any later version of Perl 5 you may have available.
+
+=cut
 
 1;

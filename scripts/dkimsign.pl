@@ -13,12 +13,14 @@ use Mail::DKIM::Signer;
 use Getopt::Long;
 use Pod::Usage;
 
+my $type = "dkim";
 my $selector = "selector1";
 my $algorithm = "rsa-sha1";
 my $method = "simple";
 my $debug_canonicalization;
 my $help;
 GetOptions(
+		"type=s" => \$type,
 		"algorithm=s" => \$algorithm,
 		"method=s" => \$method,
 		"selector=s" => \$selector,
@@ -30,13 +32,21 @@ pod2usage(1) if $help;
 pod2usage("Error: unrecognized argument(s)")
 	unless (@ARGV == 0);
 
+my $debugfh;
+if (defined $debug_canonicalization)
+{
+	open $debugfh, ">", $debug_canonicalization
+		or die "Error: cannot write $debug_canonicalization: $!\n";
+}
+
 my $dkim = new Mail::DKIM::Signer(
-		Policy => "MySignerPolicy",
+		Policy => \&signer_policy,
 		Algorithm => $algorithm,
 		Method => $method,
 		Selector => $selector,
 		KeyFile => "private.key",
-		Debug_Canonicalization => $debug_canonicalization);
+		Debug_Canonicalization => $debugfh,
+		);
 
 while (<STDIN>)
 {
@@ -45,18 +55,33 @@ while (<STDIN>)
 }
 $dkim->CLOSE;
 
+if ($debugfh)
+{
+	close $debugfh;
+	print STDERR "wrong canonicalized message to $debug_canonicalization\n";
+}
+
 print $dkim->signature->as_string . "\n";
 
-package MySignerPolicy;
-use Mail::DKIM::SignerPolicy;
-use base "Mail::DKIM::SignerPolicy";
-
-sub apply
+sub signer_policy
 {
-	my ($self, $signer) = @_;
+	my $dkim = shift;
 
-	$signer->domain($signer->message_sender->host);
-	return 1;
+	use Mail::DKIM::DkSignature;
+
+	$dkim->domain($dkim->message_sender->host);
+
+	my $class = $type eq "domainkeys" ? "Mail::DKIM::DkSignature"
+		: "Mail::DKIM::Signature";
+	my $sig = $class->new(
+			Algorithm => $dkim->algorithm,
+			Method => $dkim->method,
+			Headers => $dkim->headers,
+			Domain => $dkim->domain,
+			Selector => $dkim->selector,
+		);
+	$dkim->add_signature($sig);
+	return;
 }
 
 __END__
@@ -69,6 +94,7 @@ dkimsign.pl - computes a DKIM signature for an email message
 
   dkimsign.pl [options] < original_email.txt
     options:
+      --type=TYPE
       --method=METHOD
       --selector=SELECTOR
       --debug-canonicalization=FILE
@@ -79,6 +105,11 @@ dkimsign.pl - computes a DKIM signature for an email message
 =head1 OPTIONS
 
 =over
+
+=item B<--type>
+
+Determines the desired signature. Use dkim for a DKIM-Signature, or
+domainkeys for a DomainKey-Signature.
 
 =item B<--method>
 

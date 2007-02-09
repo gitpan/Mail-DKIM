@@ -10,8 +10,8 @@
 use strict;
 use warnings;
 
-use Mail::DKIM::Canonicalization::nowsp;
 use Mail::DKIM::Signature;
+use Mail::DKIM::DkSignature;
 use Mail::Address;
 
 =head1 NAME
@@ -23,7 +23,7 @@ Mail::DKIM::Verifier - verifies a DKIM-signed message
   use Mail::DKIM::Verifier;
 
   # create a verifier object
-  my $dkim = Mail::DKIM::Verifier->new_object();
+  my $dkim = Mail::DKIM::Verifier->new();
 
   # read an email from a file handle
   $dkim->load(*STDIN);
@@ -57,9 +57,22 @@ Mail::DKIM::Verifier - verifies a DKIM-signed message
 
 =head1 CONSTRUCTOR
 
-=head2 new_object() - construct an object-oriented verifier
+=head2 new() - construct an object-oriented verifier
 
-  my $dkim = Mail::DKIM::Verifier->new_object();
+  my $dkim = Mail::DKIM::Verifier->new();
+
+  my $dkim = Mail::DKIM::Verifier->new(%options);
+
+The only option supported at this time is:
+
+=over
+
+=item Debug_Canonicalization
+
+if specified, the canonicalized message for the first signature
+is written to the referenced string or file handle.
+
+=back
 
 =cut
 
@@ -67,7 +80,7 @@ package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
 use Error ":try";
-our $VERSION = '0.18';
+our $VERSION = '0.22';
 
 sub init
 {
@@ -114,6 +127,11 @@ sub handle_header
 	{
 		$self->add_signature($line);
 	}
+
+	if (lc($field_name) eq "domainkey-signature")
+	{
+		$self->add_signature_dk($line);
+	}
 }
 
 sub add_signature
@@ -134,23 +152,51 @@ sub add_signature
 	}
 }
 
+# parses a DomainKeys-type signature
+sub add_signature_dk
+{
+	my $self = shift;
+	croak "wrong number of arguments" unless (@_ == 1);
+	my ($contents) = @_;
+
+	eval
+	{
+		my $signature = Mail::DKIM::DkSignature->parse($contents);
+		push @{$self->{signatures}}, $signature;
+	};
+	if ($@)
+	{
+		chomp (my $E = $@);
+		$self->{signature_reject_reason} = $E;
+	}
+}
+
 sub check_signature
 {
 	my $self = shift;
 	croak "wrong number of arguments" unless (@_ == 1);
 	my ($signature) = @_;
 
-#	unless ($signature->algorithm && $signature->algorithm eq "rsa-sha1")
-#	{
-#		# unsupported algorithm
-#		$self->{signature_reject_reason} = "unsupported algorithm";
-#		return 0;
-#	}
+	unless ($signature->algorithm
+		&& $signature->get_algorithm_class($signature->algorithm))
+	{
+		# unsupported algorithm
+		$self->{signature_reject_reason} = "unsupported algorithm";
+		if ($signature->algorithm)
+		{
+			$self->{signature_reject_reason} .= " " . $signature->algorithm;
+		}
+		return 0;
+	}
 
 	unless ($signature->check_canonicalization)
 	{
 		# unsupported canonicalization method
 		$self->{signature_reject_reason} = "unsupported canonicalization";
+		if ($signature->method)
+		{
+			$self->{signature_reject_reason} .= " " . $signature->method;
+		}
 		return 0;
 	}
 
@@ -158,6 +204,10 @@ sub check_signature
 	{
 		# unsupported protocol
 		$self->{signature_reject_reason} = "unsupported protocol";
+		if ($signature->protocol)
+		{
+			$self->{signature_reject_reason} .= " " . $signature->protocol;
+		}
 		return 0;
 	}
 
@@ -236,9 +286,8 @@ sub finish_header
 {
 	my $self = shift;
 
-	# The message may have contained zero, one, or multiple signatures.
-	# In the case of multiple signatures, we need to loop through each
-	# one, finding one that we can use to verify.
+	# Signatures we found and were successfully parsed are stored in
+	# $self->{signatures}. If none were found, our result is "none".
 
 	if (@{$self->{signatures}} == 0
 		&& !defined($self->{signature_reject_reason}))
@@ -247,7 +296,11 @@ sub finish_header
 		return;
 	}
 
-	$self->{signature} = undef;
+	# For each parsed signature, check it for validity. If none are valid,
+	# our result is "invalid" and our result detail will be the reason
+	# why the last signature was invalid.
+
+	my @valid = ();
 	foreach my $signature (@{$self->{signatures}})
 	{
 		next unless ($self->check_signature($signature));
@@ -276,52 +329,85 @@ sub finish_header
 		}
 
 		# this signature is ok
-		$self->{signature} = $signature;
-		last;
+		push @valid, $signature;
 	}
 
-	unless ($self->{signature})
+	unless (@valid)
 	{
+		# no valid signatures found
 		$self->{result} = "invalid";
 		$self->{details} = $self->{signature_reject_reason};
 		return;
 	}
 
-	# create a canonicalization filter and algorithm
-	my $algorithm_class = $self->get_algorithm_class(
-				$self->{signature}->algorithm);
-	$self->{algorithm} = $algorithm_class->new(
-				Signature => $self->{signature},
-				Debug_Canonicalization => $self->{Debug_Canonicalization},
-			);
+	# now, for each valid signature, create an "algorithm" object which
+	# will process the message
 
-	# output header as received so far into canonicalization
-	foreach my $line (@{$self->{headers}})
+	$self->{algorithms} = [];
+	foreach my $signature (@valid)
 	{
-		$self->{algorithm}->add_header($line);
+		# create a canonicalization filter and algorithm
+		my $algorithm_class = $signature->get_algorithm_class(
+					$signature->algorithm);
+		my $algorithm = $algorithm_class->new(
+					Signature => $signature,
+					Debug_Canonicalization => $self->{Debug_Canonicalization},
+				);
+
+		# output header as received so far into canonicalization
+		foreach my $line (@{$self->{headers}})
+		{
+			$algorithm->add_header($line);
+		}
+		$algorithm->finish_header;
+
+		# save the algorithm
+		push @{$self->{algorithms}}, $algorithm;
 	}
-	$self->{algorithm}->finish_header;
 }
 
 sub finish_body
 {
 	my $self = shift;
 
-	if ($self->{algorithm})
+	foreach my $algorithm (@{$self->{algorithms}})
 	{
 		# finish canonicalizing
-		$self->{algorithm}->finish_body;
-
-		die "no public key" unless ($self->{public_key});
+		$algorithm->finish_body;
 
 		# verify signature
-		$@ = undef;
-		my $signb64 = $self->{signature}->signature;
-		my $verify_result = $self->{algorithm}->verify($signb64,
-		                                               $self->{public_key});
-		$self->{result} = $verify_result ? "pass" : "fail";
-		$self->{details} = $self->{algorithm}->{verification_details}
-			|| $@;
+		my $result;
+		my $details;
+		local $@ = undef;
+		try
+		{
+			$result = $algorithm->verify() ? "pass" : "fail";
+			$details = $algorithm->{verification_details} || $@;
+		}
+		otherwise
+		{
+			my $E = shift;
+			$result = "fail";
+			$details = $E;
+			chomp $details;
+			if ($details =~ /(OpenSSL error: .*?) at /)
+			{
+				$details = $1;
+			}
+			elsif ($details =~ /^(panic:.*?) at /)
+			{
+				$details = "OpenSSL $1";
+			}
+		};
+
+		# collate results ... ignore failed signatures if we already got
+		# one to pass
+		if (!$self->{result} || $result eq "pass")
+		{
+			$self->{signature} = $algorithm->signature;
+			$self->{result} = $result;
+			$self->{details} = $details;
+		}
 	}
 }
 
@@ -361,11 +447,13 @@ sub fetch_author_policy
 {
 	my $self = shift;
 	use Mail::DKIM::Policy;
-	if ($self->message_originator)
+	my $originator = $self->message_originator;
+	if ($originator && $originator->host)
 	{
+		# TODO - be prepared to handle key protocols != dns
 		return fetch Mail::DKIM::Policy(
 				Protocol => "dns",
-				Domain => $self->message_originator->host);
+				Domain => $originator->host);
 	}
 	return undef;
 }
@@ -424,10 +512,6 @@ contains a correct value for the message.
 Returned if a valid DKIM-Signature header was found, but the signature
 does not contain a correct value for the message.
 
-=item none
-
-Returned if no DKIM-Signature headers (valid or invalid) were found.
-
 =item invalid
 
 Returned if no valid DKIM-Signature headers were found, but there is at
@@ -435,7 +519,14 @@ least one invalid DKIM-Signature header. For a reason why a
 DKIM-Signature header found in the message was invalid,
 see $dkim->{signature_reject_reason}.
 
+=item none
+
+Returned if no DKIM-Signature headers (valid or invalid) were found.
+
 =back
+
+In case of multiple signatures, the "best" result will be returned.
+Best is defined as "pass", followed by "fail", "invalid", and "none".
 
 =cut
 
@@ -457,7 +548,7 @@ The following are possible results from the result_detail() method:
   invalid (unsupported protocol)
   invalid (missing d= parameter)
   invalid (missing s= parameter)
-  invalid (detected forbidden v= tag)
+  invalid (unsupported v=0.1 tag)
   invalid (no public key available)
   invalid (public key has been revoked)
   none
@@ -468,6 +559,22 @@ The following are possible results from the result_detail() method:
 
 Accesses the signature found and verified in this message. The returned
 object is of type Mail::DKIM::Signature.
+
+In case of multiple signatures, the signature with the "best" result will
+be returned.
+Best is defined as "pass", followed by "fail", "invalid", and "none".
+
+=head1 AUTHOR
+
+Jason Long, E<lt>jlong@messiah.eduE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2006 by Messiah College
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.6 or,
+at your option, any later version of Perl 5 you may have available.
 
 =cut
 

@@ -49,12 +49,6 @@ sub PRINT
 	my $self = shift;
 	my $buf = $self->{buf} . join("", @_);
 
-#	if ($buf =~ /[^\t\015\012\040-\377]/)
-	if ($buf =~ /[^\t\015\012\040-\777]/)
-	{
-		croak "control character detected in message";
-	}
-
 	while (length $buf)
 	{
 		if ($self->{in_header} && $buf =~ /^\015\012/s)

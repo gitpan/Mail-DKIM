@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::Simple tests => 22;
+use Test::More tests => 35;
 
 use Mail::DKIM::Verifier;
 
@@ -36,6 +36,7 @@ test_email("mine_ietf01_1.txt", "pass");
 test_email("mine_ietf01_2.txt", "pass");
 test_email("mine_ietf01_3.txt", "pass");
 test_email("mine_ietf01_4.txt", "pass");
+test_email("mine_ietf05_1.txt", "pass");
 test_email("good_ietf00_1.txt", "pass");
 test_email("good_ietf00_2.txt", "pass");
 test_email("good_ietf00_3.txt", "pass");
@@ -43,12 +44,36 @@ test_email("good_ietf00_4.txt", "pass");
 test_email("good_ietf00_5.txt", "pass");
 test_email("good_ietf01_1.txt", "pass");
 test_email("good_ietf01_2.txt", "pass");
+test_email("multiple_1.txt", "pass");
+
 test_email("bad_ietf01_1.txt", "fail");
 ok($dkim->result_detail =~ /body/, "determined body had been altered");
 test_email("bad_ietf01_2.txt", "fail");
-ok($dkim->result_detail =~ /header/, "determined header had been altered");
+ok($dkim->result_detail =~ /message/, "determined message had been altered");
 test_email("bad_ietf01_3.txt", "fail");
 ok($dkim->result_detail =~ /RSA/, "determined RSA failure");
+test_email("bad_1.txt", "fail");
+print "# " . $dkim->result_detail . "\n";
+SKIP:
+{
+	skip "did not recognize OpenSSL error", 1
+		unless ($dkim->result_detail =~ /OpenSSL/i);
+	like($dkim->result_detail,
+		qr/OpenSSL/i,
+		"determined OpenSSL error");
+}
+
+test_email("ignore_1.txt", "invalid");
+test_email("ignore_2.txt", "invalid");
+test_email("ignore_3.txt", "invalid");
+test_email("ignore_4.txt", "invalid");
+test_email("ignore_5.txt", "invalid");
+test_email("ignore_6.txt", "invalid");
+
+# test older DomainKeys messages, from Gmail and Yahoo!
+test_email("good_dk_gmail.txt", "pass");
+test_email("good_dk_yahoo.txt", "pass");
+test_email("good_dk_1.txt", "pass");
 
 sub read_file
 {
@@ -65,6 +90,7 @@ sub read_file
 sub test_email
 {
 	my ($file, $expected_result) = @_;
+	print "# verifying message '$file'\n";
 	$dkim = Mail::DKIM::Verifier->new();
 	my $path = "t/corpus/" . $file;
 	unless (-f $path)
@@ -75,7 +101,6 @@ sub test_email
 	$dkim->PRINT($email);
 	$dkim->CLOSE;
 	my $result = $dkim->result;
-	print "# verifying message '$file'\n";
 	print "#   result: " . $dkim->result_detail . "\n";
 	ok($result eq $expected_result, "'$file' should '$expected_result'");
 }

@@ -1,7 +1,154 @@
+2007-01-19: Jason Long <jlong@messiah.edu>
+ * t/verifiter.t: relaxed the OpenSSL check a little more
+ * DKIM.pm, README, others: updated copyright to include 2007;
+   updated abstract to include DomainKeys; updated version number
+
+2007-01-19: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm: in case of unsupported algorithm,
+   canonicalization method, or key protocol, list the bad protocol
+   in the error message to make diagnosing easier
+ * lib/Mail/DKIM/DkSignature.pm: fix a use-of-undefined-scalar bug
+
+2007-01-17: Jason Long <jlong@messiah.edu>
+ * t/verifier.t: fixed testing bug that was too strict about what
+   error message OpenSSL generates
+ * lib/Mail/DKIM/Verifier.pm: handle OpenSSL panic message better
+
+ -- VERSION 0.21 --
+
+2006-11-27: Jason Long <jlong@messiah.edu>
+ * t/verifier.t: test domainkey message with trailing blank line
+ * lib/Mail/DKIM/Canonicalization/dk_nofws.pm: fixed bug where DomainKey-
+   signed message with trailing blank line was not canonicalized correctly,
+   reported by Mark Martinec.
+
+2006-11-13: Jason Long <jlong@messiah.edu>
+ * t/verifier.t: test invalid signature length
+ * lib/Mail/DKIM/Verifier.pm: fixed bug where OpenSSL error was not
+   reported by moved "local $@" outside try block, thanks to Mark Martinec
+   for finding this; detect OpenSSL error and clean up the error message
+
+ -- VERSION 0.20 --
+
+2006-10-24: Jason Long <jlong@messiah.edu>
+ * t/signer_policy.t, t/signer.t: use new() instead of new_object()
+ * lib/Mail/DKIM/Algorithm/Base.pm: allow debugging body canonicalization
+ * lib/Mail/DKIM/MessageParser.pm: removed problematic check for
+   "control characters"
+ * scripts/dkimsign.pl: document --type argument; replace signer policy class
+   with signer policy subroutine
+
+2006-10-23: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Signer.pm: bugfix - signatures weren't setup correctly when
+   policy built the signature
+ * lib/Mail/DKIM/Signature.pm: bugfix - empty headerlist should return empty
+   list
+ * lib/Mail/DKIM/Canonicalization/Base.pm: moved support for Debug_Canonicalization
+   here from Algorithm/*
+ * lib/Mail/DKIM/Algorithm/Base.pm: removed Debug_Canonicalization support
+ * lib/Mail/DKIM/Algorithm/dk_rsa_sha1.pm: removed Debug_Canonicalization support
+
+2006-10-23: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Signer.pm, lib/Mail/DKIM/Verifier.pm: use new() instead of
+   new_object(); new_object() still supported; documented
+   Debug_Canonicalization option
+
+2006-10-20: Jason Long <jlong@messiah.edu>
+ * t/signer_policy.t: added test for creating DomainKeys signature;
+   added test for creating multiple signatures
+ * lib/Mail/DKIM/SigningFilter.pm: removed (obsolete)
+ * scripts/test_signing_filter.pl: removed (obsolete)
+ * lib/Mail/DKIM/Signer.pm: added signatures method
+
+2006-10-20: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM.pm, lib/Mail/DKIM/Signer.pm, lib/Mail/DKIM/Verifier.pm:
+   various documentation fixes
+ * lib/Mail/DKIM/Verifier.pm: set signature property when result is determined
+ * lib/Mail/DKIM/Signer.pm: support addition of multiple signatures;
+   changed default canonicalization method to "relaxed"
+
+2006-10-20: Jason Long <jlong@messiah.edu>
+ * t/signer_policy.t: tests different forms of signing policies
+ * lib/Mail/DKIM/Signer.pm: support code references as a signing policy;
+   removed support for build_signature (I'm gonna do this a different way)
+
+2006-10-20: Jason Long <jlong@messiah.edu>
+ * t/verifier: added a message containing multiple signatures, only one of
+   which is valid
+   - t/corpus/multiple_1.txt: the new message
+ * lib/Mail/DKIM/Algorithm/Base.pm: added signature method; changed method
+   signature of verify method (no parameters needed any more)
+ * lib/Mail/DKIM/Algorithm/rsa_sha1.pm,
+   lib/Mail/DKIM/Algorithm/rsa_sha256.pm,
+   lib/Mail/DKIM/Algorithm/dk_rsa_sha1.pm: updated verify method
+ * lib/Mail/DKIM/Verifier.pm: support verification of multiple signatures
+ * lib/Mail/DKIM/Signer.pm: documented use of policy _function_ rather than
+   policy object; but no implementation yet
+ * lib/Mail/DKIM/Common.pm (add_body): support multiple algorithms (needed
+   to verify multiple signatures)
+ * lib/Mail/DKIM/Signature.pm: renamed signature() to data(); signature still
+   available for backwards compatibility
+
+2006-10-19: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/SignerPolicy.pm: document mechanism for users to
+   construct the signature themselves
+ * lib/Mail/DKIM/Canonicalization/DkCommon.pm,
+ * lib/Mail/DKIM/Canonicalization/dk_simple.pm,
+   lib/Mail/DKIM/Canonicalization/dk_nofws.pm: implemented DomainKeys'
+   canonicalization methods
+ * lib/Mail/DKIM/Canonicalization/Base.pm: clarify use of add_body method
+ * lib/Mail/DKIM/Algorithm/Base.pm: clarify use of add_body method
+ * lib/Mail/DKIM/DkSignature.pm: implements DomainKeys signatures
+ * lib/Mail/DKIM/Signer.pm: allow policy to construct the signature, if
+   it implements the build_signature method; allow policy access to
+   header field names (headers method)
+ * lib/Mail/DKIM/Signature.pm: replace use of obsolete method() with
+   canonicalization()
+ * scripts/dkimsign.pl: allow user to specify signature type
+
+2006-10-12: Jason Long <jlong@messiah.edu>
+ * t/verifier: added two new DomainKeys messages to test
+   - t/corpus/good_dk_yahoo.txt
+   - t/corpus/good_dk_gmail.txt
+ * lib/Mail/DKIM/Canonicalization/dk_nofws.pm: added support for the
+   DomainKeys "nofws" canonicalization method
+ * lib/Mail/DKIM/Verifier.pm: recognize DomainKeys signatures;
+   signatures now determine which algorithm class to use
+ * lib/Mail/DKIM/Algorithm/Base.pm: refactored a few things to better
+   accomodate non-DKIM algorithms
+ * lib/Mail/DKIM/Algorithm/dk_rsa_sha1.pm: implements the DomainKeys
+   rsa-sha1 algorithm
+ * lib/Mail/DKIM/DkSignature.pm: handles DomainKeys signatures
+ * lib/Mail/DKIM/Signer.pm: signature now determines which algorithm class
+   to use
+ * lib/Mail/DKIM/PublicKey.pm: change an error message from "headers have
+   been alterered" to "message has been altered" (if the headers have been
+   altered, we really cannot imply that the body is still intact)
+ * lib/Mail/DKIM/Common.pm: removed get_algorithm_class (this is now a
+   signature method)
+ * lib/Mail/DKIM/Signature.pm: added get_algorithm_class; documented
+   get_public_key method
+
+2006-09-28: Jason Long <jlong@messiah.edu>
+ * README: include "Error" in the list of dependencies
+ * lib/Mail/DKIM/Common.pm (get_algorithm_class): return undef instead of
+   throwing an error when an unsupported algorithm is presented
+ * lib/Mail/DKIM/Signature.pm (parse): allow v=0.5 tag
+   (check_protocol): checks for dns option /txt (i.e. "dns/txt")
+   (version): new method for getting/setting v= tag
+ * lib/Mail/DKIM/Verifier.pm (check_signature): fixed algorithm check
+ * t/verifier: added several additional sample emails to verify, including
+   a ietf05 signature, and six cases where the signature should be ignored
+   for one reason or another
+
+ -- VERSION 0.19 --
+
 2006-06-15: Jason Long <jlong@messiah.edu>
  * Makefile.PL: change Perl version check to v5.6.1 instead of 5.8
  * t/verifier.t: use binmode function instead of ":raw" layer, for
    Perl 5.6.1 compatibility
+
+ -- VERSION 0.18 --
 
 2006-06-09: Jason Long <jlong@messiah.edu>
  * t/verifier.t: open message in ":raw" mode to avoid CRLF->LF
@@ -17,6 +164,8 @@
    Crypt::RSA::DataFormat
  * Makefile.PL, README: remove mentions of Crypt::RSA and
    Crypt::OpenSSL::Bignum
+
+ -- VERSION 0.17 --
 
 2006-05-26: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Algorithm/Base.pm: check_body_hash() - new method
@@ -56,6 +205,8 @@
  * lib/Mail/DKIM/Common.pm: remove version number from this file
  * lib/Mail/DKIM.pm: bump version to 0.17
  * README: bump version to 0.17
+
+ -- VERSION 0.16 --
 
 2006-03-03: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Policy.pm: new() and testing() are now warning-free

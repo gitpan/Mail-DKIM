@@ -32,48 +32,32 @@ sub init
 {
 	my $self = shift;
 
-	$self->{debug_buf} = "";
+	croak "no signature" unless $self->{Signature};
 
-	if ($self->{Signature})
-	{
-		$self->{mode} = $self->{Signature}->signature ? "verify" : "sign";
-		$self->{draft_version} ||=
-			($self->{mode} eq "sign" ? "01" :
-			 $self->{Signature}->body_hash ? "01" : "00");
+	$self->{mode} = $self->{Signature}->signature ? "verify" : "sign";
+	$self->{draft_version} ||=
+		($self->{mode} eq "sign" ? "01" :
+		 $self->{Signature}->body_hash ? "01" : "00");
 
-		# allows subclasses to set the header_digest and body_digest
-		# properties
-		$self->init_digests;
+	# allows subclasses to set the header_digest and body_digest
+	# properties
+	$self->init_digests;
 
-		my ($header_method, $body_method)
-			= $self->{Signature}->canonicalization;
+	my ($header_method, $body_method)
+		= $self->{Signature}->canonicalization;
 
-		my ($header_buffer, $body_buffer);
-		if ($self->{Debug_Canonicalization})
-		{
-			$self->{debug_buf} = "";
-			$header_buffer = \$self->{debug_buf};
-			$self->{debug_body_buf} = "";
-			$body_buffer = \$self->{debug_body_buf};
-		}
-
-		my $header_class = $self->get_canonicalization_class($header_method);
-		my $body_class = $self->get_canonicalization_class($body_method);
-		$self->{canon} = $header_class->new(
-				buffer => $header_buffer,
-				output_digest => $self->{header_digest},
-				draft_version => $self->{draft_version},
-				Signature => $self->{Signature});
-		$self->{body_canon} = $body_class->new(
-				buffer => $body_buffer,
-				output_digest => $self->{body_digest},
-				draft_version => $self->{draft_version},
-				Signature => $self->{Signature});
-	}
-	else
-	{
-		die "no signature";
-	}
+	my $header_class = $self->get_canonicalization_class($header_method);
+	my $body_class = $self->get_canonicalization_class($body_method);
+	$self->{canon} = $header_class->new(
+			output_digest => $self->{header_digest},
+			draft_version => $self->{draft_version},
+			Signature => $self->{Signature},
+			Debug_Canonicalization => $self->{Debug_Canonicalization});
+	$self->{body_canon} = $body_class->new(
+			output_digest => $self->{body_digest},
+			draft_version => $self->{draft_version},
+			Signature => $self->{Signature},
+			Debug_Canonicalization => $self->{Debug_Canonicalization});
 }
 
 # override this method, please...
@@ -83,7 +67,7 @@ sub init_digests
 	die "not implemented";
 }
 
-# private method
+# private method - DKIM-specific
 sub get_canonicalization_class
 {
 	my $self = shift;
@@ -135,12 +119,15 @@ of the DKIM algorithm implementation classes, such as rsa_sha1:
   $algorithm->add_body("This is the body.\015\012");
   $algorithm->add_body("Another line of the body.\015\012");
 
+The body should be fed one "line" at a time.
+
 =cut
 
 sub add_body
 {
 	my $self = shift;
-	$self->{body_canon}->add_body(@_);
+	my $canon = $self->{body_canon} || $self->{canon};
+	$canon->add_body(@_);
 }
 
 =head2 add_header() - feeds a header field into the algorithm/canonicalization
@@ -172,7 +159,8 @@ from the algorithm.
 sub finish_body
 {
 	my $self = shift;
-	$self->{body_canon}->finish_body;
+	my $body_canon = $self->{body_canon} || $self->{canon};
+	$body_canon->finish_body;
 	$self->finish_message;
 }
 
@@ -243,28 +231,8 @@ sub finish_message
 		$canonicalized = "\015\012" . $canonicalized;
 	}
 
-	$self->{header_digest}->add($canonicalized);
-
-	if (my $debug = $self->{Debug_Canonicalization})
-	{
-		$self->{debug_buf} .= $canonicalized;
-		unless (ref $debug)
-		{
-			my $filename = $debug;
-			open my $fh, ">", $filename
-				or die "Error: cannot write to $filename: $!\n";
-			print $fh "-----BEGIN CANONICALIZED HEADERS-----\015\012";
-			print $fh $self->{debug_buf};
-			print $fh "-----END CANONICALIZED HEADERS-----\015\012";
-			print $fh "-----BEGIN CANONICALIZED BODY-----\015\012";
-			print $fh $self->{debug_body_buf};
-			print $fh "-----END CANONICALIZED BODY-----\015\012";
-			close $fh;
-			print STDERR "Debug: wrote canonicalized headers and body to $filename\n";
-		#	print STDERR "Body count is " . $self->{body_canon}->body_count . "\n";
-		#	print STDERR "Truncated " . $self->{body_canon}->{body_truncated} . "\n";
-		}
-	}
+	$self->{canon}->output($canonicalized);
+	#$self->{header_digest}->add($canonicalized);
 }
 
 =head2 sign() - generates a signature using a private key
@@ -279,12 +247,32 @@ sub sign
 	die "Not implemented";
 }
 
-=head2 verify() - verifies a signature using the public key
+=head2 signature() - get/set the signature worked on by this algorithm
 
-  $result = $algorithm->verify($base64, $public_key);
+  my $old_signature = $algorithm->signature;
+  $algorithm->signature($new_signature);
+
+=cut
+
+sub signature
+{
+	my $self = shift;
+	@_ and
+		$self->{Signature} = shift;
+	return $self->{Signature};
+}
+
+=head2 verify() - verifies a signature
+
+  $result = $algorithm->verify();
+
+Must be called after finish_body().
 
 The result is a true/false value: true indicates the signature data
-($base64) is valid, false indicates it is invalid.
+is valid, false indicates it is invalid.
+
+For an invalid signature, details may be obtained from
+$algorithm->{verification_details} or $@.
 
 =cut
 
