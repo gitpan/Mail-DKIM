@@ -81,7 +81,7 @@ See Mail::DKIM::SignerPolicy for more information about policy objects.
 package Mail::DKIM::Signer;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 # PROPERTIES
 #
@@ -170,7 +170,9 @@ sub finish_header
 	my $policy = $self->{Policy};
 	if (UNIVERSAL::isa($policy, "CODE"))
 	{
-		unless ($policy->($self))
+		# policy is a subroutine ref
+		my $default_sig = $policy->($self);
+		unless (@{$self->{algorithms}} || $default_sig)
 		{
 			$self->{"result"} = "skipped";
 			return;
@@ -178,6 +180,7 @@ sub finish_header
 	}
 	elsif ($policy && $policy->can("apply"))
 	{
+		# policy is a Perl object or class
 		my $default_sig = $policy->apply($self);
 		unless (@{$self->{algorithms}} || $default_sig)
 		{

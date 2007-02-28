@@ -126,6 +126,25 @@ sub body_hash
 	croak "body_hash not implemented";
 }
 
+=head2 algorithm() - get or set the algorithm (a=) field
+
+The algorithm used to generate the signature.
+Defaults to "rsa-sha1", an RSA-signed SHA-1 digest.
+
+=cut
+
+sub algorithm
+{
+	my $self = shift;
+
+	if (@_)
+	{
+		$self->set_tag("a", shift);
+	}
+
+	return lc $self->get_tag("a") || 'rsa-sha1';
+}	
+
 =head2 canonicalization() - get or set the canonicalization (c=) field
 
   $signature->canonicalization("nofws");
@@ -272,7 +291,9 @@ sub protocol {
 	(@_) and
 		$self->set_tag("q", shift);
 
-	return $self->get_tag("q");
+	# although draft-delany-domainkeys-base-06 does mandate presence of a
+	# q=dns tag, it is quote common that q tag is missing - be merciful
+	return !defined($self->get_tag("q")) ? 'dns' : $self->get_tag("q");
 }	
 
 =head2 selector() - get or set the selector (s=) field

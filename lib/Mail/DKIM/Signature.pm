@@ -44,14 +44,14 @@ sub new {
 	my $self = {};
 	bless $self, $type;
 
-	#$self->version("0.5");
+	$self->version("0.5");
 	$self->algorithm($prms{'Algorithm'} || "rsa-sha1");
 	$self->signature($prms{'Signature'});
 	$self->canonicalization($prms{'Method'} || "simple");
 	$self->domain($prms{'Domain'});
 	$self->headerlist($prms{'Headers'});
-	$self->protocol($prms{'Query'} || "dns");
-	#$self->protocol($prms{'Query'} || "dns/txt");
+	#$self->protocol($prms{'Query'} || "dns");
+	$self->protocol($prms{'Query'} || "dns/txt");
 	$self->selector($prms{'Selector'});
 
 	return $self;
@@ -417,16 +417,14 @@ sub get_public_key
 			Domain => $self->domain);
 		unless ($pubk)
 		{
-			#$self->status("no key"),
-			#$self->errorstr("no public key available"),
 			die "no public key available\n";
 		}
 
 		if ($pubk->revoked)
 		{
-			#$self->status("revoked"),
-			#$self->errorstr("public key has been revoked"),
-			die "public key has been revoked\n";
+			# FIXME- the key was checked in fetch(), so if the
+			# key was really revoked, we shouldn't have gotten here
+			die "public key: revoked\n";
 		}
 
 		$self->{public} = $pubk;

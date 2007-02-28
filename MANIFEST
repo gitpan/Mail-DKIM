@@ -55,6 +55,7 @@ t/corpus/good_ietf01_2.txt
 t/corpus/good_dk_yahoo.txt
 t/corpus/good_dk_gmail.txt
 t/corpus/good_dk_1.txt
+t/corpus/good_dk_2.txt
 t/corpus/multiple_1.txt
 t/corpus/bad_ietf01_1.txt
 t/corpus/bad_ietf01_2.txt
@@ -71,3 +72,6 @@ t/corpus/ignore_3.txt
 t/corpus/ignore_4.txt
 t/corpus/ignore_5.txt
 t/corpus/ignore_6.txt
+t/corpus/no_body_1.txt
+t/corpus/no_body_2.txt
+t/corpus/no_body_3.txt

@@ -80,7 +80,7 @@ package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
 use Error ":try";
-our $VERSION = '0.22';
+our $VERSION = '0.23';
 
 sub init
 {
@@ -182,7 +182,7 @@ sub check_signature
 	{
 		# unsupported algorithm
 		$self->{signature_reject_reason} = "unsupported algorithm";
-		if ($signature->algorithm)
+		if (defined $signature->algorithm)
 		{
 			$self->{signature_reject_reason} .= " " . $signature->algorithm;
 		}
@@ -193,7 +193,7 @@ sub check_signature
 	{
 		# unsupported canonicalization method
 		$self->{signature_reject_reason} = "unsupported canonicalization";
-		if ($signature->method)
+		if (defined $signature->method)
 		{
 			$self->{signature_reject_reason} .= " " . $signature->method;
 		}
@@ -202,26 +202,26 @@ sub check_signature
 
 	unless ($signature->check_protocol)
 	{
-		# unsupported protocol
-		$self->{signature_reject_reason} = "unsupported protocol";
-		if ($signature->protocol)
-		{
-			$self->{signature_reject_reason} .= " " . $signature->protocol;
-		}
+		# unsupported query protocol
+		$self->{signature_reject_reason} =
+			!defined($signature->protocol) ? "missing q tag"
+			: "unsupported query protocol, q=" . $signature->protocol;
 		return 0;
 	}
 
-	unless ($signature->domain)
+	unless ($signature->domain ne '')
 	{
 		# no domain specified
-		$self->{signature_reject_reason} = "missing d= parameter";
+		$self->{signature_reject_reason} =
+			!defined($signature->domain) ? "missing d tag"
+			: "invalid domain in d tag";
 		return 0;
 	}
 
 	unless ($signature->selector)
 	{
 		# no selector specified
-		$self->{signature_reject_reason} = "missing s= parameter";
+		$self->{signature_reject_reason} = "missing s tag";
 		return 0;
 	}
 
@@ -386,18 +386,18 @@ sub finish_body
 		}
 		otherwise
 		{
-			my $E = shift;
+			# see also add_signature
+			chomp (my $E = shift);
+			if ($E =~ /(OpenSSL error: .*?) at /)
+			{
+				$E = $1;
+			}
+			elsif ($E =~ /^(panic:.*?) at /)
+			{
+				$E = "OpenSSL $1";
+			}
 			$result = "fail";
 			$details = $E;
-			chomp $details;
-			if ($details =~ /(OpenSSL error: .*?) at /)
-			{
-				$details = $1;
-			}
-			elsif ($details =~ /^(panic:.*?) at /)
-			{
-				$details = "OpenSSL $1";
-			}
 		};
 
 		# collate results ... ignore failed signatures if we already got
@@ -545,12 +545,20 @@ The following are possible results from the result_detail() method:
   fail (headers have been altered)
   fail (body has been altered)
   invalid (unsupported canonicalization)
-  invalid (unsupported protocol)
-  invalid (missing d= parameter)
-  invalid (missing s= parameter)
+  invalid (unsupported query protocol)
+  invalid (invalid domain in d tag)
+  invalid (missing q tag)
+  invalid (missing d tag)
+  invalid (missing s tag)
   invalid (unsupported v=0.1 tag)
   invalid (no public key available)
-  invalid (public key has been revoked)
+  invalid (public key: does not support email)
+  invalid (public key: does not support hash algorithm 'sha1')
+  invalid (public key: unsupported key type)
+  invalid (public key: missing p= tag)
+  invalid (public key: revoked)
+  invalid (public key: invalid data)
+  invalid (public key: OpenSSL error: ...)
   none
 
 =head2 signature() - access the message's DKIM signature
