@@ -5,7 +5,6 @@ MANIFEST
 README
 TODO
 HACKING.DKIM
-META.yml                                 Module meta-data (added by MakeMaker)
 lib/Mail/DKIM.pm
 lib/Mail/DKIM/Algorithm/Base.pm
 lib/Mail/DKIM/Algorithm/dk_rsa_sha1.pm
@@ -61,6 +60,12 @@ t/corpus/bad_ietf01_1.txt
 t/corpus/bad_ietf01_2.txt
 t/corpus/bad_ietf01_3.txt
 t/corpus/bad_1.txt
+t/corpus/badkey_1.txt
+t/corpus/badkey_2.txt
+t/corpus/badkey_3.txt
+t/corpus/badkey_4.txt
+t/corpus/badkey_5.txt
+t/corpus/badkey_6.txt
 t/corpus/mine_ietf01_1.txt
 t/corpus/mine_ietf01_2.txt
 t/corpus/mine_ietf01_3.txt
@@ -75,3 +80,4 @@ t/corpus/ignore_6.txt
 t/corpus/no_body_1.txt
 t/corpus/no_body_2.txt
 t/corpus/no_body_3.txt
+META.yml                                 Module meta-data (added by MakeMaker)

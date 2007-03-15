@@ -570,7 +570,7 @@ sub protocol {
 	my $q = $self->get_tag("q");
 	if (not defined $q)
 	{
-		return "dns/";
+		return "dns/txt";
 	}
 	elsif ($q =~ m#/#)
 	{
@@ -617,10 +617,7 @@ sub data
 	}
 
 	my $b = $self->get_tag("b");
-	if (defined $b)
-	{
-		$b =~ s/\s+//g;
-	}
+	$b =~ tr/\015\012 \t//d  if defined $b;
 	return $b;
 }	
 
