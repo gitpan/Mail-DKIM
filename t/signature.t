@@ -1,10 +1,11 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -I../lib
 
 use strict;
 use warnings;
 use Test::Simple tests => 9;
 
 use Mail::DKIM::Signature;
+use Mail::DKIM::TextWrap;
 
 my $signature = Mail::DKIM::Signature->new();
 ok($signature, "new() works");
@@ -36,3 +37,9 @@ Content-Transfer-Encoding; s 	 = 	 foo;
 $signature = Mail::DKIM::Signature->parse($unparsed);
 ok($signature, "parse() works (II)");
 ok($signature->domain eq "example.org", "parse() correctly handles spaces");
+
+print "#BEFORE->\n" . $signature->as_string . "\n";
+$signature->prettify_safe;
+print "#SAFE--->\n" . $signature->as_string . "\n";
+$signature->prettify;
+print "#PRETTY->\n" . $signature->as_string . "\n";

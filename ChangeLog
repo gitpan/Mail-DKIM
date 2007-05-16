@@ -1,3 +1,38 @@
+2007-05-10: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/KeyValueList.pm: separator should be "\015\012" not "\n";
+   allow splitting on whitespace in a colon-separated list value
+ * Makefile.PL: it seems version 0.22 or better is required of
+   Crypt::OpenSSL::RSA
+
+2007-05-01: Jason Long <jlong@messiah.edu>
+ * t/signature.t: test prettify_safe()
+ * lib/Mail/DKIM/TextWrap.pm: new wrapping module to help with prettifying
+   the signature
+ * lib/Mail/DKIM/KeyValueList.pm (wrap): new method to help wrap the
+   signature
+ * lib/Mail/DKIM/Signature.pm: wrap the signature
+ * lib/Mail/DKIM/Algorithm/Base.pm: oops, prettify() should only be called
+   when we're _making_ the signature
+ * lib/Mail/DKIM/KeyValueList.pm (wrap): only do something if TextWrap
+   has been loaded (no longer automatically load it)
+ * lib/Mail/DKIM/Signature.pm (prettify): better default value for Start
+
+2007-04-16: Jason Long <jlong@messiah.edu>
+ * t/signature.t: test that prettify() doesn't choke
+ * lib/Mail/DKIM/Algorithm/Base.pm: call prettify() before hashing the
+   signature header
+ * lib/Mail/DKIM/Signer.pm: call prettify_safe() after generating the
+   signature data
+ * lib/Mail/DKIM/Signature.pm: stubs for prettify() and prettify_safe()
+ * lib/Mail/DKIM/KeyValueList.pm: parse() can now be called on an existing
+   key-value-list to regenerate the tag data from a string
+
+2007-04-15: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/PublicKey.pm: bug fix- if Net::DNS caused an exception,
+   there was a race condition for resetting the alarm
+ * lib/Mail/DKIM/Signer.pm: limit which headers are signed
+ * t/signer.t: test that undesirable headers are not signed
+
  -- VERSION 0.24 --
 
 2007-03-09: Jason Long <jlong@messiah.edu>

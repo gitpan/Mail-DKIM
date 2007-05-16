@@ -623,6 +623,51 @@ sub data
 
 *signature = \*data;
 
+=head2 prettify() - alters the signature to look "nicer" as an email header
+
+  $signature->prettify;
+
+This method may alter the signature in a way that breaks signatures, so
+it should be done ONLY when the signature is being generated, BEFORE being
+fed to the canonicalization algorithm.
+
+=cut
+
+sub prettify
+{
+	my $self = shift;
+	$self->wrap(
+		Start => length($self->{prefix} || "DKIM-Signature:"),
+		Tags => {
+			b => "b64",
+			bh => "b64",
+			h => "list",
+			},
+		);
+}
+
+=head2 prettify_safe() - same as prettify() but only touches the b= part
+
+  $signature->prettify_safe;
+
+This method will not break the signature, but it only affects the b= part
+of the signature.
+
+=cut
+
+sub prettify_safe
+{
+	my $self = shift;
+	$self->wrap(
+		Start => length($self->{prefix} || "DKIM-Signature:"),
+		Tags => {
+			b => "b64",
+			},
+		PreserveNames => 1,
+		Default => "preserve", #preserves unknown tags
+		);
+}
+
 =head2 timestamp() - get or set the signature timestamp (t=) field
 
 Signature timestamp (default is undef, meaning unknown creation time).
