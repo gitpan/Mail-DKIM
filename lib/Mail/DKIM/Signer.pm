@@ -81,7 +81,7 @@ See Mail::DKIM::SignerPolicy for more information about policy objects.
 package Mail::DKIM::Signer;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = '0.26';
+our $VERSION = '0.28';
 
 # PROPERTIES
 #
@@ -469,6 +469,10 @@ sub selector
 Returns the generated signature. The signature is an object of type
 Mail::DKIM::Signature. If multiple signatures were generated, this method
 returns the last one.
+
+The signature should be B<prepended> to the message to make the
+resulting message. At the very least, it should precede any headers
+that were signed.
 
 =head2 signatures() - access list of generated signature objects
 

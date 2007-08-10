@@ -1,3 +1,64 @@
+2007-07-31: Jason Long <jlong@messiah.edu>
+ * Makefile.PL: OpenSSL 0.23 segfaults on certain signatures, so
+   the requirement is now Crypt::OpenSSL::RSA 0.24 or better
+ * lib/Mail/DKIM/KeyValueList.pm: don't split the header in the middle
+   of a tag name
+
+ -- VERSION 0.27 --
+
+2007-07-25: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Signature.pm (identity_matches): new method to help
+   comparing a From/Sender address with the signature identity
+ * lib/Mail/DKIM/DkimPolicy.pm, Policy.pm: use identity_matches function
+
+2007-07-18: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm: changed fetch_policy() back to
+   fetch_author_policy(); added fetch_sender_policy();
+   save results for each signature
+ * lib/Mail/DKIM/Policy.pm: now implements just Dk policies
+ * lib/Mail/DKIM/DkimPolicy.pm: a new module for DKIM signing practices
+ * lib/Mail/DKIM/Signature.pm: can now get/set the verification result
+   for each signature
+ * scripts/dkimsign.pl: handle DOS-formated input
+ * scripts/dkimverify.pl: show multiple signatures' results; show
+   both policy results
+
+2007-06-11: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm: public_key no longer available as a
+   verifier property; use eval block instead of try...otherwise;
+   experimental signatures() method
+ * lib/Mail/DKIM/Verifier.pm: added description section to Perldocs;
+   replaced a couple try...otherwise blocks with eval blocks
+
+2007-06-08: Jason Long <jlong@messiah.edu>
+ * policies.txt: some thoughts on dealing with two different types of
+   policy records
+ * lib/Mail/DKIM/Policy.pm: default() is now a private class method
+ * lib/Mail/DKIM/PublicKey.pm: moved DNS query to DNS.pm
+ * lib/Mail/DKIM/Policy.pm: moved DNS query to DNS.pm
+ * lib/Mail/DKIM/DNS.pm: new module that does the common DNS lookups
+
+2007-06-07: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Common.pm: change "parse Mail::Address" to my preferred
+   "Mail::Address->parse" style
+ * t/policy.t: test policy lookup by email address instead of domain;
+   test policy lookups on a few well known domains
+ * lib/Mail/DKIM/Verifier.pm: minor doc changes; renamed
+   fetch_author_policy() to fetch_policy(); fetch_author_policy still
+   works for backward compatibility
+ * lib/Mail/DKIM/Policy.pm: allow lookups given sender/from addresses
+   (location): new method to determine where the policy came from
+
+2007-06-05: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Policy.pm: create the default policy only once;
+   (is_implied_default_policy): new method to check whether the policy
+   was explicit or implied
+   (fetch): get policy record at the Yahoo!-DomainKeys-defined location,
+   rather than the location in the not-yet-finished DKIM SSP spec.
+ * t/policy.t: test is_implied_default_policy method
+
+ -- VERSION 0.26 --
+
 2007-05-24: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Signature.pm: accept and use v=1 tag instead of v=0.5
  * lib/Mail/DKIM/Policy.pm: oops, left a syntax error in here

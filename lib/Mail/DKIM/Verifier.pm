@@ -28,7 +28,7 @@ Mail::DKIM::Verifier - verifies a DKIM-signed message
   # read an email from a file handle
   $dkim->load(*STDIN);
 
-  # or read an email and pass it into the verifier, one line at a time
+  # or read an email and pass it into the verifier, incrementally
   while (<STDIN>)
   {
       # remove local line terminators
@@ -45,15 +45,25 @@ Mail::DKIM::Verifier - verifies a DKIM-signed message
 
 =cut
 
-#=head1 DESCRIPTION
-#
-#The verification process does the following, in order:
-#
-# 1. Reads all the headers.
-# 2. Select a valid signature to verify.
-# 3. Sets up an appropriate algorithm and canonicalization implementation.
-# 4. Feeds the headers into the algorithm/canonicalization implementation.
-# 5. Reads the body and feeds it into the body canonicalization.
+=head1 DESCRIPTION
+
+The verifier object allows an email message to be scanned for DKIM and
+DomainKeys signatures and those signatures to be verified. The verifier
+tracks the state of the message as it is read into memory. When the
+message has been completely read, the signatures are verified and the
+results of the verification can be accessed.
+
+To use the verifier, first create the verifier object. Then start
+"feeding" it the email message to be verified. When all the headers
+have been read, the verifier:
+
+ 1. checks whether any DomainKeys/DKIM signatures were found
+ 2. queries for the public keys needed to verify the signatures
+ 3. sets up the appropriate algorithms and canonicalization objects
+ 4. canonicalizes the headers and computes the header hash
+
+Then, when the body of the message has been completely fed into the
+verifier, the body hash is computed and the signatures are verified.
 
 =head1 CONSTRUCTOR
 
@@ -80,7 +90,7 @@ package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
 use Error ":try";
-our $VERSION = '0.26';
+our $VERSION = '0.28';
 
 sub init
 {
@@ -90,8 +100,9 @@ sub init
 }
 
 # @{$dkim->{signatures}}
-#   list of syntactically valid signatures found in the header,
-#   from the top of the header to the bottom
+#   array of L<Mail::DKIM::Signature> objects, representing all
+#   syntactically valid signatures found in the header,
+#   ordered from the top of the header to the bottom.
 #
 # $dkim->{signature_reject_reason}
 #   simple string listing a reason, if any, for not using a signature.
@@ -100,20 +111,16 @@ sub init
 #   than one signatures that could not be used.
 #
 # $dkim->{signature}
-#   contains the selected Mail::DKIM::Signature object found in the header
-#
-# $dkim->{public_key}
-#   object of type Mail::DKIM::PublicKey, fetched using information
-#   found in the signature
+#   the L<Mail::DKIM::Signature> selected as the "best" signature.
 #
 # @{$dkim->{headers}}
-#   list of headers found in the header
+#   array of strings, each member is one header, in its original format.
 #
-# $dkim->{algorithm} - same as Signer
-# $dkim->{canon} - same as Signer
+# $dkim->{algorithms}
+#   array of algorithms, one for each signature being verified.
 #
 # $dkim->{result}
-#   result of the verification (see the result() method)
+#   string; the result of the verification (see the result() method)
 #
 
 sub handle_header
@@ -251,20 +258,20 @@ sub check_public_key
 	my ($signature, $public_key) = @_;
 
 	my $result = 0;
-	try
+	eval
 	{
 		# check public key's allowed hash algorithms
 		$result = $public_key->check_hash_algorithm(
 				$signature->hash_algorithm);
 
 		# TODO - check public key's granularity
-	}
-	otherwise
+	};
+	if ($@)
 	{
-		my $E = shift;
+		my $E = $@;
 		chomp $E;
 		$self->{signature_reject_reason} = $E;
-	};
+	}
 	return $result;
 }
 
@@ -306,20 +313,21 @@ sub finish_header
 		next unless ($self->check_signature($signature));
 
 		# get public key
-		try
+		my $pkey;
+		eval
 		{
-			$self->{public_key} = $signature->get_public_key;
-		}
-		otherwise
+			$pkey = $signature->get_public_key;
+		};
+		if ($@)
 		{
-			my $E = shift;
+			my $E = $@;
 			chomp $E;
 			$self->{signature_reject_reason} = $E;
-		};
+		}
 
-		if ($self->{public_key})
+		if ($pkey)
 		{
-			$self->check_public_key($signature, $self->{public_key})
+			$self->check_public_key($signature, $pkey)
 				or next;
 		}
 		else
@@ -379,15 +387,15 @@ sub finish_body
 		my $result;
 		my $details;
 		local $@ = undef;
-		try
+		eval
 		{
 			$result = $algorithm->verify() ? "pass" : "fail";
 			$details = $algorithm->{verification_details} || $@;
-		}
-		otherwise
+		};
+		if ($@)
 		{
 			# see also add_signature
-			chomp (my $E = shift);
+			chomp (my $E = $@);
 			if ($E =~ /(OpenSSL error: .*?) at /)
 			{
 				$E = $1;
@@ -398,7 +406,12 @@ sub finish_body
 			}
 			$result = "fail";
 			$details = $E;
-		};
+		}
+
+		# save the results of this signature verification
+		$algorithm->{result} = $result;
+		$algorithm->{details} = $details;
+		$algorithm->signature->result($result, $details);
 
 		# collate results ... ignore failed signatures if we already got
 		# one to pass
@@ -416,6 +429,8 @@ sub finish_body
 =head2 PRINT() - feed part of the message to the verifier
 
   $dkim->PRINT("a line of the message\015\012");
+  $dkim->PRINT("more of");
+  $dkim->PRINT(" the message\015\012bye\015\012");
 
 Feeds content of the message being verified into the verifier.
 The API is designed this way so that the entire message does NOT need
@@ -428,34 +443,80 @@ to be read into memory at once.
 This method finishes the canonicalization process, computes a hash,
 and verifies the signature.
 
-=head2 fetch_author_policy() - retrieves the "sender signing policy" from DNS
+=head2 fetch_author_policy() - retrieves a signing policy from DNS
 
   my $policy = $dkim->fetch_author_policy;
   my $policy_result = $policy->apply($dkim);
 
-See also the fetch() method of L<Mail::DKIM::Policy>.
+The "author" policy, as I call it, is the DKIM Sender Signing Practices
+record as described in Internet Draft draft-ietf-dkim-ssp-00-01dc.
+I call it the "author" policy because it is keyed to the email address
+in the From: header, i.e. the author of the message.
 
-The "author" policy is the policy for the address found in the From header,
-i.e. the "originator" address.
+The IETF is still actively working on this Internet Draft, so the
+exact mechanisms are subject to change.
 
-The result will be undef is there are no headers (i.e. From header) to
-indicate what policy to check.
+If the email being verified has no From header at all
+(which violates email standards),
+then this method will C<die>.
+
+The result of the apply() method is one of: "accept", "reject", "neutral".
 
 =cut
 
 sub fetch_author_policy
 {
 	my $self = shift;
+	use Mail::DKIM::DkimPolicy;
+
+	# determine address found in the "From"
+	my $author = $self->message_originator;
+	$author &&= $author->address;
+
+	# fetch the policy
+	return Mail::DKIM::DkimPolicy->fetch(
+			Protocol => "dns",
+			Author => $author,
+			);
+}
+
+=head2 fetch_sender_policy() - retrieves a signing policy from DNS
+
+  my $policy = $dkim->fetch_sender_policy;
+  my $policy_result = $policy->apply($dkim);
+
+The "sender" policy is the sender signing policy as described by the
+DomainKeys specification, now available in RFC4870(historical).
+I call it the "sender" policy because it is keyed to the email address
+in the Sender: header, or the From: header if there is no Sender header.
+This is the person whom the message claims as the "transmitter" of the
+message (not necessarily the author).
+
+If the email being verified has no From or Sender header from which to
+get an email address (which violates email standards),
+then this method will C<die>.
+
+The result of the apply() method is one of: "accept", "reject", "neutral".
+
+=cut
+
+sub fetch_sender_policy
+{
+	my $self = shift;
 	use Mail::DKIM::Policy;
-	my $originator = $self->message_originator;
-	if ($originator && $originator->host)
-	{
-		# TODO - be prepared to handle key protocols != dns
-		return Mail::DKIM::Policy->fetch(
-				Protocol => "dns",
-				Domain => $originator->host);
-	}
-	return undef;
+
+	# determine addresses found in the "From" and "Sender" headers
+	my $author = $self->message_originator;
+	$author &&= $author->address;
+	my $sender = $self->message_sender;
+	$sender &&= $sender->address;
+
+	# fetch the policy
+	return Mail::DKIM::Policy->fetch(
+			Protocol => "dns",
+			Author => $author,
+			Sender => $sender,
+			);
 }
 
 =head2 load() - load the entire message from a file handle
@@ -571,6 +632,25 @@ object is of type Mail::DKIM::Signature.
 In case of multiple signatures, the signature with the "best" result will
 be returned.
 Best is defined as "pass", followed by "fail", "invalid", and "none".
+
+=cut
+
+#EXPERIMENTAL
+# =head2 signatures() - access all of this message's signatures
+#
+#   my @all_signatures = $dkim->signatures;
+#
+# =cut
+#TODO
+# how would the caller get the verification results of each signature?
+# are they stored in the signature object?
+sub signatures
+{
+	my $self = shift;
+	croak "unexpected argument" if @_;
+
+	return map { $_->signature } @{$self->{algorithms}};
+}
 
 =head1 AUTHOR
 

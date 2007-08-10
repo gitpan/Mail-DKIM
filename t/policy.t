@@ -1,10 +1,11 @@
-#!/usr/bin/perl
+#!/usr/bin/perl -I../blib/lib
 
 use strict;
 use warnings;
-use Test::Simple tests => 9;
+use Test::Simple tests => 12;
 
 use Mail::DKIM::Policy;
+use Mail::DKIM::DkimPolicy;
 
 my $policy;
 $policy = Mail::DKIM::Policy->new();
@@ -17,6 +18,7 @@ $policy = Mail::DKIM::Policy->fetch(
 		Protocol => "dns",
 		Domain => "messiah.edu");
 ok($policy, "fetch() works (requires DNS)");
+ok(!$policy->is_implied_default_policy, "not the default policy");
 
 $policy = Mail::DKIM::Policy->parse(String => "");
 ok($policy, "parse() works (no tags)");
@@ -33,3 +35,49 @@ ok(!$policy->testing, "testing flag has default value");
 #$policy->testing(1);
 #ok($policy->testing, "testing flag has been changed");
 
+$policy = Mail::DKIM::Policy->fetch(
+		Protocol => "dns",
+		Sender => 'alfred@nobody.messiah.edu',
+		);
+ok($policy, "fetch() returns policy for nonexistent domain");
+ok($policy->is_implied_default_policy, "yep, it's the default policy");
+
+#debug_policies(qw(yahoo.com hotmail.com gmail.com));
+#debug_policies(qw(paypal.com ebay.com));
+#debug_policies(qw(cisco.com sendmail.com));
+
+sub debug_policies
+{
+	foreach my $domain (@_)
+	{
+		print "# $domain:\n";
+
+		print "#  DomainKeys: ";
+		my $policy = Mail::DKIM::Policy->fetch(
+			Protocol => "dns",
+			Domain => $domain);
+		if ($policy->is_implied_default_policy)
+		{
+			print "no policy\n";
+		}
+		else
+		{
+			print $policy->policy . " (";
+			print $policy->as_string . ")\n";
+		}
+
+		print "#  DKIM: ";
+		$policy = Mail::DKIM::DkimPolicy->fetch(
+			Protocol => "dns",
+			Domain => $domain);
+		if ($policy->is_implied_default_policy)
+		{
+			print "no policy\n";
+		}
+		else
+		{
+			print $policy->policy . " (";
+			print $policy->as_string . ")\n";
+		}
+	}
+}

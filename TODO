@@ -1,9 +1,11 @@
 DKIM-Signature:
  - allow version tag (DONE)
  - accept q=dns/txt (DONE)
+ - method to set/get "z" tag
 
 DKIM Public Key Records:
  - enforce t=s option (if present)
+ - provide method for caller to get (to check the "testing" flag)
 
 Verifier:
  - verify multiple signatures (ietf05 6.1) (DONE)
@@ -24,13 +26,19 @@ Verifier:
    DNS queries as early as possible, but continue processing other aspects
    of the message while waiting for the DNS queries to complete)
 
+Policy:
+ - make it possible to determine explicit vs implicit default policy (DONE)
+ - lookup BOTH draft-allman-dkim-ssp policy AND rfc4870(historical) policy
+ - this will probably be: lookup allman policy, and if not found, then try
+   rfc4870(historical) policy
+
 Signer:
  - allow DomainKeys signatures without using a policy object
  - allow adding chained signatures in one pass
    (e.g. allow adding a DomainKeys signature, and a DKIM signature,
    with the new DKIM signature signing the new DomainKeys signature) (REJECTED)
  - allow creation of i=, l=, t=, x=, and z= tags
- - do header-wrapping to signature before signing
+ - do header-wrapping to signature before signing (DONE)
  - allow signer policy to change which private key is used
 
 Testing (some of this may already be implemented):
