@@ -81,7 +81,7 @@ See Mail::DKIM::SignerPolicy for more information about policy objects.
 package Mail::DKIM::Signer;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = '0.28';
+our $VERSION = '0.29';
 
 # PROPERTIES
 #
@@ -130,9 +130,6 @@ sub init
 
 	if (defined $self->{KeyFile})
 	{
-		croak "not a file: " . $self->{KeyFile}
-			unless (-f $self->{KeyFile});
-
 		$self->{private} = Mail::DKIM::PrivateKey->load(
 				File => $self->{KeyFile});
 	}
@@ -219,6 +216,8 @@ sub finish_header
 				Headers => $self->headers,
 				Domain => $self->{"Domain"},
 				Selector => $self->{"Selector"},
+				($self->{"Identity"} ?
+					(Identity => $self->{"Identity"}) : ()),
 			));
 	}
 

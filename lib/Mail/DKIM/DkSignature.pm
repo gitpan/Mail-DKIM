@@ -195,7 +195,9 @@ sub domain
 
 sub expiration
 {
-	croak "expiration not implemented";
+	my $self = shift;
+	croak "cannot change expiration on " . ref($self) if @_;
+	return undef;
 }
 
 use MIME::Base64;
@@ -275,7 +277,7 @@ sub identity
 
 sub method
 {
-	croak "method not implemented";
+	croak "method not implemented (use canonicalization instead)";
 }	
 
 =head2 protocol() - get or set the query methods (q=) field

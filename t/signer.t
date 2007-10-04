@@ -2,13 +2,14 @@
 
 use strict;
 use warnings;
-use Test::Simple tests => 12;
+use Test::Simple tests => 14;
 
 use Mail::DKIM::Signer;
 
 my $EXPECTED_RE = qr/njTGkk8JIhv23OEV4VSokdvN5q/;
 
-my $keyfile = -f "t/test.key" ? "t/test.key" : "test.key";
+my $tdir = -f "t/test.key" ? "t" : ".";
+my $keyfile = "$tdir/test.key";
 my $dkim = Mail::DKIM::Signer->new(
 		Algorithm => "rsa-sha1",
 		Method => "relaxed",
@@ -61,6 +62,7 @@ $dkim = Mail::DKIM::Signer->new(
 		Method => "relaxed",
 		Domain => "example.org",
 		Selector => "test",
+		Identity => "bob\@example.org",
 		KeyFile => $keyfile);
 ok($dkim, "new() works");
 
@@ -68,10 +70,42 @@ $dkim->PRINT($sample_email);
 $dkim->CLOSE;
 
 ok($dkim->signature, "signature() works");
-print "# signature=" . $signature->as_string . "\n";
+print "# signature=" . $dkim->signature->as_string . "\n";
+
+# check whether the signature includes/excludes certain header fields
 my $sigstr = $dkim->signature->as_string;
 ok($sigstr =~ /subject/i, "subject was signed");
 ok($sigstr =~ /from/i, "from was signed");
 ok($sigstr !~ /received/i, "received was excluded");
 ok($sigstr !~ /comments/i, "comments was excluded");
-ok($sigstr =~ /$EXPECTED_RE/, "got expected signature value");
+
+# check if the identity got included
+ok($sigstr =~ /i=bob\@/, "got expected identity value");
+
+eval {
+$dkim = Mail::DKIM::Signer->new(
+		Algorithm => "rsa-sha1",
+		Method => "relaxed",
+		Domain => "example.org",
+		Selector => "test",
+		KeyFile => "$tdir/non_existent_file_!!");
+};
+{
+my $E = $@;
+print "# $E" if $E;
+ok($E, "new() with bogus key file dies as expected");
+}
+
+eval {
+$dkim = Mail::DKIM::Signer->new(
+		Algorithm => "rsa-sha1",
+		Method => "relaxed",
+		Domain => "example.org",
+		Selector => "test",
+		KeyFile => "$tdir/unreadable_file");
+};
+{
+my $E = $@;
+print "# $E" if $E;
+ok($E, "new() with bogus key file dies as expected");
+}
