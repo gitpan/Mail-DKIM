@@ -1,7 +1,88 @@
+2007-10-30: Jason Long <jlong@messiah.edu>
+ * t/corpus/good_rfc4871_3.txt: to test extra tags in signature
+ * scripts/dkimsign.pl: allow user to specify arbitrary extra tags for
+   putting in the signature
+ * lib/Mail/DKIM/MessageParser.pm: make "not implemented" messages
+   more helpful
+ * t/corpus/badkey_10.txt: to test key with t=s
+ * lib/Mail/DKIM/Verifier.pm: allow check_granularity() to return different
+   detail messages; describe two additional result_detail possibilities
+ * lib/Mail/DKIM/PublicKey.pm (check_granularity): check for empty g= value;
+   check for subdomain usage;
+   (subdomain_flag): helper method to look for "s" in flags
+   (flags): return default value if no t= tag
+
+2007-10-26: Jason Long <jlong@messiah.edu>
+ * t/corpus/badkey_9.txt: to test empty g= in selector
+ * t/corpus/ignore_8.txt: to test bad i= value in signature
+ * lib/Mail/DKIM/Verifier.pm: check signature identity value
+
+2007-10-24: Jason Long <jlong@messiah.edu>
+ * t/corpus/badkey_8.txt, ignore_5.txt, ignore_6.txt: fix signature so
+   it would verify if not for the flaw in the public key
+ * scripts/dkimsign.pl: allow key protocol to be specified on command
+   line
+ * lib/Mail/DKIM/Verifier.pm: update documentation on possible error
+   codes
+ * lib/Mail/DKIM/PublicKey.pm: cleanup error code
+
+2007-10-24: Jason Long <jlong@messiah.edu>
+ * t/corpus/badkey_*.txt: changed subjects to indicate which test it is
+ * t/corpus/badkey_7.txt, badkey_8.txt, goodkey_1.txt, goodkey_2.txt,
+   goodkey_3.txt: additional tests of public key features
+ * t/corpus/verifier.t: test the new test messages
+ * lib/Mail/DKIM/Verifier.pm (check_public_key): check key granularity
+   and report the problem if it doesn't match
+ * lib/Mail/DKIM/PublicKey.pm (check_granularity): a method for testing
+   the granularity
+   (granularity): return the default value of '*' if g= not defined
+ * scripts/dkimsign.pl: ability to set i= tag from command-line
+
+2007-10-24: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm (check_signature): do signature version check
+   here
+   (finish_header): report invalid signature details to the signature
+   object
+   (signatures): return all parsed signatures, not just "valid" signatures
+ * lib/Mail/DKIM/Signature.pm: some misc. cleanup
+   (check_version): version check is now a separate method, rather than
+   being part of parse()
+ * lib/Mail/DKIM/DkSignature.pm (check_version): always true
+ * t/corpus/multiple_2.txt: a message testing multiple signatures with
+   different results
+ * t/verifier.t: verify that each signature's results are available and
+   correct
+
+2007-10-24: Jason Long <jlong@messiah.edu>
+ * t/corpus/ignore_7.txt: a message with an expired signature
+ * lib/Mail/DKIM/Signature.pm: recognize Expiration as a parameter
+ * scripts/dkimsign.pl: make it possible to create a signature with an
+   x= tag
+ * t/verifier.t: test ignore_7.txt message, should "ignore"
+ * lib/Mail/DKIM/Verifier.pm: check signature expiration when verifying
+ * lib/Mail/DKIM/Signature.pm (check_expiration): new method
+
+2007-10-08: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Signer.pm: use "Key" property instead of "private" to
+   store the private key; new methods key() and key_file(); allow each
+   signature to have its own private key
+ * t/signer_policy.t: test specifying a key file in a policy
+
 2007-10-04: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/MessageParser.pm: return nonzero for PRINT and CLOSE
  * lib/Mail/DKIM/DkSignature.pm: make expiration() for DomainKey-Signature
    behave more compatibly with expiration() for DKIM-Signature
+ * lib/Mail/DKIM/Verifier.pm: remove dependency on Error module
+ * README: what I'm interested in if make test fails
+ * lib/Mail/DKIM/Signer.pm: fix bug reported by dairiki, who noticed that
+   the Signer class ignored the signature-specified algorithm when
+   building the algorithm object
+ * scripts/dkimsign.pl: update POD a bit
+ * scripts/dkimverify.pl: add POD
+ * lib/Mail/DKIM/Canonicalization/Base.pm, Algorithm/Base.pm:
+   add see also, author, copyright sections to POD
+ * lib/Mail/DKIM/Algorithm/rsa_sha1.pm, rsa_sha256.pm: remove useless pod
+ * ...and others...: inline documentation (POD) cleanup
 
 2007-10-03: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Canonicalization/DkCommon.pm: attempt at making the

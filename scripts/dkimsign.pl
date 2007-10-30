@@ -1,6 +1,6 @@
 #!/usr/bin/perl -I../lib
 #
-# Copyright (c) 2005-2006 Messiah College. This program is free software.
+# Copyright (c) 2005-2007 Messiah College. This program is free software.
 # You can redistribute it and/or modify it under the terms of the
 # GNU Public License as found at http://www.fsf.org/copyleft/gpl.html.
 #
@@ -17,6 +17,10 @@ my $type = "dkim";
 my $selector = "selector1";
 my $algorithm = "rsa-sha1";
 my $method = "simple";
+my $expiration;
+my $identity;
+my $key_protocol;
+my @extra_tag;
 my $debug_canonicalization;
 my $binary;
 my $help;
@@ -25,7 +29,11 @@ GetOptions(
 		"algorithm=s" => \$algorithm,
 		"method=s" => \$method,
 		"selector=s" => \$selector,
+		"expiration=i" => \$expiration,
+		"identity=s" => \$identity,
+		"key-protocol=s" => \$key_protocol,
 		"debug-canonicalization=s" => \$debug_canonicalization,
+		"extra-tag=s" => \@extra_tag,
 		"binary" => \$binary,
 		"help|?" => \$help,
 		)
@@ -89,7 +97,15 @@ sub signer_policy
 			Headers => $dkim->headers,
 			Domain => $dkim->domain,
 			Selector => $dkim->selector,
+			defined($expiration) ? (Expiration => time() + $expiration) : (),
+			defined($identity) ? (Identity => $identity) : (),
 		);
+	$sig->protocol($key_protocol) if defined $key_protocol;
+	foreach my $extra (@extra_tag)
+	{
+		my ($n, $v) = split /=/, $extra, 2;
+		$sig->set_tag($n, $v);
+	}
 	$dkim->add_signature($sig);
 	return;
 }
@@ -107,6 +123,7 @@ dkimsign.pl - computes a DKIM signature for an email message
       --type=TYPE
       --method=METHOD
       --selector=SELECTOR
+      --expiration=INTEGER
       --debug-canonicalization=FILE
 
   dkimsign.pl --help
@@ -115,6 +132,11 @@ dkimsign.pl - computes a DKIM signature for an email message
 =head1 OPTIONS
 
 =over
+
+=item B<--expiration>
+
+Optional. Specify the desired signature expiration, as a delta
+from the signature timestamp.
 
 =item B<--type>
 
@@ -134,5 +156,17 @@ to computing the DKIM signature. This is helpful for debugging
 canonicalization methods.
 
 =back
+
+=head1 AUTHOR
+
+Jason Long, E<lt>jlong@messiah.eduE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2006-2007 by Messiah College
+
+This program is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.6 or,
+at your option, any later version of Perl 5 you may have available.
 
 =cut

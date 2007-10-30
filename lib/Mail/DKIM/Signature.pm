@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Copyright 2005-2006 Messiah College. All rights reserved.
+# Copyright 2005-2007 Messiah College. All rights reserved.
 # Jason Long <jlong@messiah.edu>
 
 # Copyright (c) 2004 Anthony D. Urso. All rights reserved.
@@ -20,13 +20,13 @@ use Carp;
 
 =head1 NAME
 
-Mail::DKIM::Signature - encapsulates a DKIM signature header
+Mail::DKIM::Signature - represents a DKIM-Signature header
 
 =head1 CONSTRUCTORS
 
 =head2 new() - create a new signature from parameters
 
-  my $signature = new Mail::DKIM::Signature(
+  my $signature = Mail::DKIM::Signature->new(
                       [ Algorithm => "rsa-sha1", ]
                       [ Signature => $base64, ]
                       [ Method => "relaxed", ]
@@ -35,15 +35,17 @@ Mail::DKIM::Signature - encapsulates a DKIM signature header
                       [ Headers => "from:subject:date:message-id", ]
                       [ Query => "dns", ]
                       [ Selector => "alpha", ]
+                      [ Expiration => time() + 86400, ]
                   );
 
 =cut
 
-sub new {
-	my $type = shift;
+sub new
+{
+	my $class = shift;
 	my %prms = @_;
 	my $self = {};
-	bless $self, $type;
+	bless $self, $class;
 
 	$self->version("1");
 	$self->algorithm($prms{'Algorithm'} || "rsa-sha1");
@@ -51,17 +53,17 @@ sub new {
 	$self->canonicalization($prms{'Method'} || "simple");
 	$self->domain($prms{'Domain'});
 	$self->headerlist($prms{'Headers'});
-	#$self->protocol($prms{'Query'} || "dns");
 	$self->protocol($prms{'Query'} || "dns/txt");
 	$self->selector($prms{'Selector'});
 	$self->identity($prms{'Identity'}) if exists $prms{'Identity'};
+	$self->expiration($prms{'Expiration'}) if defined $prms{'Expiration'};
 
 	return $self;
 }
 
 =head2 parse() - create a new signature from a DKIM-Signature header
 
-  my $sig = parse Mail::DKIM::Signature(
+  my $sig = Mail::DKIM::Signature->parse(
                   "DKIM-Signature: a=rsa-sha1; b=yluiJ7+0=; c=relaxed"
             );
 
@@ -96,16 +98,6 @@ sub parse
 
 	my $self = $class->SUPER::parse($string);
 	$self->{prefix} = $prefix;
-
-	# check version
-	if (my $version = $self->version)
-	{
-		my @ALLOWED_VERSIONS = ("0.5", "1");
-		unless (grep {$_ eq $version} @ALLOWED_VERSIONS)
-		{
-			die "unsupported v=$version tag\n";
-		}
-	}
 
 	return $self;
 }
@@ -308,6 +300,102 @@ sub canonicalization
 	}
 }	
 
+use MIME::Base64;
+
+# checks whether this signature specifies a legal canonicalization method
+# returns true if the canonicalization is acceptable, false otherwise
+#
+sub check_canonicalization
+{
+	my $self = shift;
+
+	my ($c1, $c2) = $self->canonicalization;
+
+	my @known = ("nowsp", "simple", "relaxed");
+	return undef unless (grep { $_ eq $c1 } @known);
+	return undef unless (grep { $_ eq $c2 } @known);
+	return 1;
+}
+
+# checks whether the expiration time on this signature is acceptable
+# returns a true value if acceptable, false otherwise
+#
+sub check_expiration
+{
+	my $self = shift;
+	my $x = $self->expiration;
+	return 1 if not defined $x;
+
+	$self->{_verify_time} ||= time();
+	return ($self->{_verify_time} <= $x);
+}
+
+# checks whether the protocol found on this signature is valid for
+# fetching the public key
+# returns a true value if protocol is "dns/txt", false otherwise
+#
+sub check_protocol
+{
+	my $self = shift;
+
+	my ($type, $options) = split(/\//, $self->protocol, 2);
+	return unless ($type eq "dns");
+	return if ($options && $options ne "txt");
+
+	my $v = $self->version;
+	if ($v)
+	{
+		# in v=1 signatures, the /txt option is REQUIRED
+		return unless ($options && $options eq "txt");
+	}
+	return 1;
+}
+
+# checks whether the version tag has an acceptable value
+# returns true if so, otherwise false
+#
+sub check_version
+{
+	my $self = shift;
+
+	# check version
+	if (my $version = $self->version)
+	{
+		my @ALLOWED_VERSIONS = ("0.5", "1");
+		return (grep {$_ eq $version} @ALLOWED_VERSIONS);
+	}
+
+	# we still consider a missing v= tag acceptable,
+	# for backwards-compatibility
+	return 1;
+}
+
+=head2 data() - get or set the signature data (b=) field
+
+  my $base64 = $signature->data;
+  $signature->data($base64);
+
+The signature data. Whitespace is automatically stripped from the
+returned value. The data is Base64-encoded.
+
+=cut
+
+sub data
+{
+	my $self = shift;
+
+	if (@_)
+	{
+		$self->set_tag("b", shift);
+	}
+
+	my $b = $self->get_tag("b");
+	$b =~ tr/\015\012 \t//d  if defined $b;
+	return $b;
+}	
+
+*signature = \*data;
+
 =head2 domain() - get or set the domain (d=) field
 
   my $d = $signature->domain;          # gets the domain value
@@ -347,41 +435,6 @@ sub expiration
 		$self->set_tag("x", shift);
 	
 	return $self->get_tag("x");
-}
-
-use MIME::Base64;
-
-sub check_canonicalization
-{
-	my $self = shift;
-
-	my ($c1, $c2) = $self->canonicalization;
-
-	my @known = ("nowsp", "simple", "relaxed");
-	return undef unless (grep { $_ eq $c1 } @known);
-	return undef unless (grep { $_ eq $c2 } @known);
-	return 1;
-}
-
-# checks whether the protocol found on this subject is valid for
-# fetching the public key
-# returns a true value if protocol is "dns/txt", false otherwise
-#
-sub check_protocol
-{
-	my $self = shift;
-
-	my ($type, $options) = split(/\//, $self->protocol, 2);
-	return unless ($type eq "dns");
-	return if ($options && $options ne "txt");
-
-	my $v = $self->version;
-	if ($v)
-	{
-		# in v=1 signatures, the /txt option is REQUIRED
-		return unless ($options && $options eq "txt");
-	}
-	return 1;
 }
 
 # allows the type of signature to determine what "algorithm" gets used
@@ -653,32 +706,6 @@ sub selector {
 	return $self->get_tag("s");
 }	
 
-=head2 data() - get or set the signature data (b=) field
-
-  my $base64 = $signature->data;
-  $signature->data($base64);
-
-The signature data. Whitespace is automatically stripped from the
-returned value. The data is Base64-encoded.
-
-=cut
-
-sub data
-{
-	my $self = shift;
-
-	if (@_)
-	{
-		$self->set_tag("b", shift);
-	}
-
-	my $b = $self->get_tag("b");
-	$b =~ tr/\015\012 \t//d  if defined $b;
-	return $b;
-}	
-
-*signature = \*data;
-
 =head2 prettify() - alters the signature to look "nicer" as an email header
 
   $signature->prettify;
@@ -758,6 +785,10 @@ sub version
 
 	return $self->get_tag("v");
 }
+
+=head1 SEE ALSO
+
+L<Mail::DKIM::DkSignature> for DomainKey-Signature headers
 
 =head1 AUTHOR
 

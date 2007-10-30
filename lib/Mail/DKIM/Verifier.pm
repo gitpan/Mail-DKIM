@@ -89,7 +89,6 @@ is written to the referenced string or file handle.
 package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
-use Error ":try";
 our $VERSION = '0.29';
 
 sub init
@@ -101,7 +100,7 @@ sub init
 
 # @{$dkim->{signatures}}
 #   array of L<Mail::DKIM::Signature> objects, representing all
-#   syntactically valid signatures found in the header,
+#   parseable signatures found in the header,
 #   ordered from the top of the header to the bottom.
 #
 # $dkim->{signature_reject_reason}
@@ -154,6 +153,11 @@ sub add_signature
 	};
 	if ($@)
 	{
+		# the only reason an error should be thrown is if the
+		# signature really is unparse-able
+
+		# otherwise, invalid signatures are caught in finish_header()
+
 		chomp (my $E = $@);
 		$self->{signature_reject_reason} = $E;
 	}
@@ -173,6 +177,11 @@ sub add_signature_dk
 	};
 	if ($@)
 	{
+		# the only reason an error should be thrown is if the
+		# signature really is unparse-able
+
+		# otherwise, invalid signatures are caught in finish_header()
+
 		chomp (my $E = $@);
 		$self->{signature_reject_reason} = $E;
 	}
@@ -183,6 +192,21 @@ sub check_signature
 	my $self = shift;
 	croak "wrong number of arguments" unless (@_ == 1);
 	my ($signature) = @_;
+
+	unless ($signature->check_version)
+	{
+		# unsupported version
+		if (defined $signature->version)
+		{
+			$self->{signature_reject_reason} = "unsupported version (v="
+				. $signature->version . ")";
+		}
+		else
+		{
+			$self->{signature_reject_reason} = "missing v tag";
+		}
+		return 0;
+	}
 
 	unless ($signature->algorithm
 		&& $signature->get_algorithm_class($signature->algorithm))
@@ -216,6 +240,13 @@ sub check_signature
 		return 0;
 	}
 
+	unless ($signature->check_expiration)
+	{
+		# signature has expired
+		$self->{signature_reject_reason} = "signature is expired";
+		return 0;
+	}
+
 	unless ($signature->domain ne '')
 	{
 		# no domain specified
@@ -232,6 +263,12 @@ sub check_signature
 		return 0;
 	}
 
+	unless (check_signature_identity($signature))
+	{
+		$self->{signature_reject_reason} = "bad identity";
+		return 0;
+	}
+
 	# check domain against message From: and Sender: headers
 #	my $responsible_address = $self->message_originator;
 #	if (!$responsible_address)
@@ -242,7 +279,7 @@ sub check_signature
 #
 #	my $senderdomain = $responsible_address->host;
 #	my $sigdomain = $signature->domain;
-#	if (!$self->match_subdomain($senderdomain, $sigdomain))
+#	if (!match_subdomain($senderdomain, $sigdomain))
 #	{
 #		$self->{signature_reject_reason} = "unmatched domain";
 #		return 0;
@@ -260,11 +297,16 @@ sub check_public_key
 	my $result = 0;
 	eval
 	{
+		$@ = undef;
+
 		# check public key's allowed hash algorithms
 		$result = $public_key->check_hash_algorithm(
 				$signature->hash_algorithm);
 
-		# TODO - check public key's granularity
+		# check public key's granularity
+		$result &&= $public_key->check_granularity(
+				$signature->identity);
+		die $@ if $@;
 	};
 	if ($@)
 	{
@@ -275,9 +317,24 @@ sub check_public_key
 	return $result;
 }
 
+# returns true if the i= tag is an address with a domain matching or
+# a subdomain of the d= tag
+#
+sub check_signature_identity
+{
+	my ($signature) = @_;
+
+	my $d = $signature->domain;
+	my $i = $signature->identity;
+	if ($i =~ /\@(.*)$/)
+	{
+		return match_subdomain($1, $d);
+	}
+	return 0;
+}
+
 sub match_subdomain
 {
-	my $self = shift;
 	croak "wrong number of arguments" unless (@_ == 2);
 	my ($subdomain, $superdomain) = @_;
 
@@ -310,7 +367,12 @@ sub finish_header
 	my @valid = ();
 	foreach my $signature (@{$self->{signatures}})
 	{
-		next unless ($self->check_signature($signature));
+		unless ($self->check_signature($signature))
+		{
+			$signature->result("invalid",
+				$self->{signature_reject_reason});
+			next;
+		}
 
 		# get public key
 		my $pkey;
@@ -323,16 +385,14 @@ sub finish_header
 			my $E = $@;
 			chomp $E;
 			$self->{signature_reject_reason} = $E;
+			$signature->result("invalid", $E);
+			next;
 		}
 
-		if ($pkey)
+		unless ($self->check_public_key($signature, $pkey))
 		{
-			$self->check_public_key($signature, $pkey)
-				or next;
-		}
-		else
-		{
-			# public key not available
+			$signature->result("invalid",
+				$self->{signature_reject_reason});
 			next;
 		}
 
@@ -613,12 +673,16 @@ The following are possible results from the result_detail() method:
   invalid (missing s tag)
   invalid (unsupported v=0.1 tag)
   invalid (no public key available)
-  invalid (public key: does not support email)
-  invalid (public key: does not support hash algorithm 'sha1')
+  invalid (public key: unsupported version)
   invalid (public key: unsupported key type)
   invalid (public key: missing p= tag)
-  invalid (public key: revoked)
   invalid (public key: invalid data)
+  invalid (public key: does not support email)
+  invalid (public key: does not support hash algorithm 'sha1')
+  invalid (public key: does not support signing subdomains)
+  invalid (public key: revoked)
+  invalid (public key: granularity mismatch)
+  invalid (public key: granularity is empty)
   invalid (public key: OpenSSL error: ...)
   none
 
@@ -627,7 +691,7 @@ The following are possible results from the result_detail() method:
   my $sig = $dkim->signature;
 
 Accesses the signature found and verified in this message. The returned
-object is of type Mail::DKIM::Signature.
+object is of type L<Mail::DKIM::Signature>.
 
 In case of multiple signatures, the signature with the "best" result will
 be returned.
@@ -640,16 +704,15 @@ Best is defined as "pass", followed by "fail", "invalid", and "none".
 #
 #   my @all_signatures = $dkim->signatures;
 #
+# Use $signature->result or $signature->result_detail to access
+# the verification results of each signature.
 # =cut
-#TODO
-# how would the caller get the verification results of each signature?
-# are they stored in the signature object?
 sub signatures
 {
 	my $self = shift;
 	croak "unexpected argument" if @_;
 
-	return map { $_->signature } @{$self->{algorithms}};
+	return @{$self->{signatures}};
 }
 
 =head1 AUTHOR

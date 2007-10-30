@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 47;
+use Test::More tests => 61;
 
 use Mail::DKIM::Verifier;
 
@@ -44,7 +44,13 @@ test_email("good_ietf00_4.txt", "pass");
 test_email("good_ietf00_5.txt", "pass");
 test_email("good_ietf01_1.txt", "pass");
 test_email("good_ietf01_2.txt", "pass");
+test_email("good_rfc4871_3.txt", "pass");  # tests extra tags in signature
 test_email("multiple_1.txt", "pass");
+test_email("multiple_2.txt", "pass");
+my @sigs = $dkim->signatures;
+ok($sigs[0]->result eq "invalid", "first signature is 'invalid'");
+ok($sigs[1]->result eq "pass", "second signature is 'pass'");
+ok($sigs[2]->result eq "fail", "third signature is 'fail'");
 
 test_email("bad_ietf01_1.txt", "fail");
 ok($dkim->result_detail =~ /body/, "determined body had been altered");
@@ -85,6 +91,15 @@ test_email("ignore_3.txt", "invalid"); # unsupported a= tag (a=dsa-sha1)
 test_email("ignore_4.txt", "invalid"); # unsupported c= tag (c=future)
 test_email("ignore_5.txt", "invalid"); # unsupported q= tag (q=http)
 test_email("ignore_6.txt", "invalid"); # unsupported q= tag (q=dns/special)
+test_email("ignore_7.txt", "invalid"); # expired signature
+test_email("ignore_8.txt", "invalid"); # bad i= value
+
+#
+# test variants on the public key
+#
+test_email("goodkey_1.txt", "pass"); # public key with s=email
+test_email("goodkey_2.txt", "pass"); # public key with extra tags, h=, s=, etc.
+test_email("goodkey_3.txt", "pass"); # public key with g=jl*g
 
 #
 # test problems with the public key
@@ -95,6 +110,10 @@ test_email("badkey_3.txt", "invalid"); # public key unsupported v= tag
 test_email("badkey_4.txt", "invalid"); # public key syntax error
 test_email("badkey_5.txt", "invalid"); # public key unsupported k= tag
 test_email("badkey_6.txt", "invalid"); # public key unsupported s= tag
+test_email("badkey_7.txt", "invalid"); # public key unsupported h= tag
+test_email("badkey_8.txt", "invalid"); # public key unmatched g= tag
+test_email("badkey_9.txt", "invalid"); # public key empty g= tag
+test_email("badkey_10.txt", "invalid"); # public key requires i == d
 
 
 sub read_file

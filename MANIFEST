@@ -58,9 +58,11 @@ t/corpus/good_dk_yahoo.txt
 t/corpus/good_dk_gmail.txt
 t/corpus/good_dk_1.txt
 t/corpus/good_dk_2.txt
+t/corpus/good_rfc4871_3.txt
 t/corpus/dk_headers_1.txt
 t/corpus/dk_headers_2.txt
 t/corpus/multiple_1.txt
+t/corpus/multiple_2.txt
 t/corpus/bad_ietf01_1.txt
 t/corpus/bad_ietf01_2.txt
 t/corpus/bad_ietf01_3.txt
@@ -71,6 +73,13 @@ t/corpus/badkey_3.txt
 t/corpus/badkey_4.txt
 t/corpus/badkey_5.txt
 t/corpus/badkey_6.txt
+t/corpus/badkey_7.txt
+t/corpus/badkey_8.txt
+t/corpus/badkey_9.txt
+t/corpus/badkey_10.txt
+t/corpus/goodkey_1.txt
+t/corpus/goodkey_2.txt
+t/corpus/goodkey_3.txt
 t/corpus/mine_ietf01_1.txt
 t/corpus/mine_ietf01_2.txt
 t/corpus/mine_ietf01_3.txt
@@ -82,6 +91,8 @@ t/corpus/ignore_3.txt
 t/corpus/ignore_4.txt
 t/corpus/ignore_5.txt
 t/corpus/ignore_6.txt
+t/corpus/ignore_7.txt
+t/corpus/ignore_8.txt
 t/corpus/no_body_1.txt
 t/corpus/no_body_2.txt
 t/corpus/no_body_3.txt

@@ -92,7 +92,7 @@ sub check
 	{
 		unless ($v eq "DKIM1")
 		{
-			die "unrecognized public key version\n";
+			die "public key: unsupported version\n";
 		}
 	}
 
@@ -156,6 +156,79 @@ sub check
 	return 1;
 }
 
+# check_granularity() - check whether this key matches signature identity
+# 
+# a public key record can restrict what identities it may sign with,
+#   g=, granularity, restricts the local part of the identity
+#   t=s, restricts whether subdomains can be used
+#
+# This method returns true if the given identity is allowed by this
+# public key; it returns false otherwise.
+# If false is returned, you can check C<$@> for an explanation of
+# why.
+#
+sub check_granularity
+{
+	my $self = shift;
+	my ($identity) = @_;
+
+	# check granularity
+	my $g = $self->granularity;
+
+	# do case-insensitive matching
+	$identity = lc $identity;
+	$g = lc $g;
+
+	my ($local_part, $domain_part) = split /\@/, $identity, 2;
+
+	my ($begins, $ends) = split /\*/, $g, 2;
+	if (defined $ends)
+	{
+		# the g= tag contains an asterisk
+
+		# the local part must be at least as long as the pattern
+		if (length($local_part) < length($begins) + length($ends)
+			or
+		# the local part must begin with $begins
+			substr($local_part, 0, length($begins)) ne $begins
+			or
+		# the local part must end with $ends
+			substr($local_part, -length($ends)) ne $ends)
+		{
+			$@ = "public key: granularity mismatch\n";
+			return;
+		}
+	}
+	else
+	{
+		if ($g eq "")
+		{
+			$@ = "public key: granularity is empty\n";
+			return;
+		}
+		unless ($local_part eq $begins)
+		{
+			$@ = "public key: granularity mismatch\n";
+			return;
+		}
+	}
+
+	# check subdomains
+	if ($self->subdomain_flag)
+	{
+		unless ($domain_part eq lc($self->{'Domain'}))
+		{
+			$@ = "public key: does not support signing subdomains\n";
+			return;
+		}
+	}
+
+	return 1;
+}
+
+# returns true if the actual hash algorithm used is listed by this
+# public key; dies otherwise
+#
 sub check_hash_algorithm
 {
 	my $self = shift;
@@ -226,14 +299,39 @@ sub verify {
 	return $rtrn;
 }
 
+=head2 granularity() - get or set the granularity (g=) field
+
+  my $g = $public_key->granularity;
+
+  $public_key->granularity("*");
+
+Granularity of the key. The value must match the Local-part of the
+effective "i=" tag of the DKIM-Signature header field.
+The granularity is a literal value, or a pattern with a single '*'
+wildcard character that matches zero or more characters.
+
+If no granularity is defined, then the default value, '*', will
+be returned.
+
+=cut
+
 sub granularity
 {
 	my $self = shift;
 
+	# set new granularity if provided
 	(@_) and 
 		$self->set_tag("g", shift);
 
-	return $self->get_tag("g");
+	my $g = $self->get_tag("g");
+	if (defined $g)
+	{
+		return $g;
+	}
+	else
+	{
+		return '*';
+	}
 }
 
 sub notes
@@ -266,7 +364,18 @@ sub flags
 	(@_) and 
 		$self->set_tag("t", shift);
 
-	return $self->get_tag("t");
+	return $self->get_tag("t") || "";
+}
+
+# subdomain_flag() - checks whether "s" is specified in flags
+#
+# returns true if "s" is found, false otherwise
+#
+sub subdomain_flag
+{
+	my $self = shift;
+	my @flags = split /:/, $self->flags;
+	return grep { $_ eq "s" } @flags;
 }
 
 sub revoked
@@ -299,6 +408,10 @@ sub verify_sha1_digest
 	return $self->verify_digest("SHA-1", $digest, $signature);
 }
 
+# verify_digest() - returns true if the digest verifies, false otherwise
+#
+# if false, $@ is set to a description of the problem
+#
 sub verify_digest
 {
 	my $self = shift;
