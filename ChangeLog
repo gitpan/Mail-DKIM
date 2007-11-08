@@ -1,3 +1,49 @@
+2007-11-08: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Canonicalization/relaxed.pm,
+   lib/Mail/DKIM/Canonicalization/nowsp.pm,
+   lib/Mail/DKIM/Canonicalization/DkCommon.pm,
+   lib/Mail/DKIM/Canonicalization/dk_simple.pm,
+   lib/Mail/DKIM/Canonicalization/simple.pm,
+   lib/Mail/DKIM/Canonicalization/dk_nofws.pm,
+   lib/Mail/DKIM/Canonicalization/DkimCommon.pm,
+   lib/Mail/DKIM/MessageParser.pm:
+   more speed-up optimizations by Mark Martinec, now multiple lines
+   at once can be fed into the canonicalization bits
+
+2007-11-08: Jason Long <jlong@messiah.edu>
+ * Makefile.PL, others: version bump to 0.30
+
+2007-11-08: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Signature.pm: minor doc edit
+ * scripts/dkimsign.pl: generate "pretty" signatures;
+   die on unrecognized signature type
+
+2007-11-07: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Algorithm/Base.pm: cleanup (delete commented-out code)
+ * lib/Mail/DKIM/Algorithm/dk_rsa_sha1.pm (finish_message): fix bug
+   where DomainKeys signatures were not "pretty",
+   reported by Byung-Hee HWANG.
+
+2007-11-07: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Signature.pm: allow Timestamp to be specified to new()
+ * lib/Mail/DKIM/Signer.pm: allow Timestamp to be specified to new(),
+   requested by Mark Martinec
+ * t/signer.t: test timestamp creation
+
+2007-11-06: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Canonicalization/simple.pm,
+   lib/Mail/DKIM/Canonicalization/Base.pm,
+   lib/Mail/DKIM/MessageParser.pm: speedup optimizations contributed
+   by Mark Martinec.
+ * lib/Mail/DKIM/Canonicalization/dk_simple,pm
+   lib/Mail/DKIM/Canonicalization/relaxed.pm: more speed up optimizations
+   by Mark Martinec.
+
+ -- VERSION 0.29 --
+
+2007-11-07: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm: signatures() is now public
+
 2007-10-30: Jason Long <jlong@messiah.edu>
  * t/corpus/good_rfc4871_3.txt: to test extra tags in signature
  * scripts/dkimsign.pl: allow user to specify arbitrary extra tags for

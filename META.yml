@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Mail-DKIM
-version:             0.28_2
+version:             0.29_2
 abstract:            Signs/verifies Internet mail with DKIM/DomainKey signatures
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.32
