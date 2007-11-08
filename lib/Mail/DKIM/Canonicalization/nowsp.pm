@@ -20,7 +20,7 @@ sub canonicalize_header
 	my ($line) = @_;
 
 	# remove all whitespace
-	$line =~ s/[ \t\015\012]//g;
+	$line =~ s/[\t\n\r\ ]//g;
 
 	if ($line =~ /^([^:]+):(.*)$/)
 	{
@@ -34,10 +34,10 @@ sub canonicalize_header
 sub canonicalize_body
 {
 	my $self = shift;
-	my ($multiline) = @_;
+	my ($line) = @_;
 
-	$multiline =~ s/[ \t\015\012]//g;
-	return $multiline;
+	$line =~ s/[\t\n\r\ ]//g;
+	return $line;
 }
 
 sub finish_body

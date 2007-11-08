@@ -18,19 +18,17 @@ sub canonicalize_header
 	my $self = shift;
 	my ($line) = @_;
 
-	$line =~ s/[ \t\015\012]//g;
+	$line =~ s/[\t\n\r\ ]//g;
 	return $self->SUPER::canonicalize_header($line . "\015\012");
 }
 
 sub canonicalize_body
 {
 	my $self = shift;
-	my ($multiline) = @_;
+	my ($line) = @_;
 
-	$multiline =~ s/[ \t]//g;
-	$multiline =~ s/\015(?!\012)//g;     # standalone CR
-	$multiline =~ s/([^\015])\012/$1/g;  # standalone LF
-	return $self->SUPER::canonicalize_body($multiline);
+	$line =~ s/[\t\n\r\ ]//g;
+	return $self->SUPER::canonicalize_body($line . "\015\012");
 }
 
 1;

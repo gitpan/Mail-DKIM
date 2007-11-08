@@ -47,36 +47,32 @@ sub init
 sub PRINT
 {
 	my $self = shift;
-	my $buf = $self->{buf};
-	$buf .= @_ == 1 ? $_[0] : join("", @_)  if @_;
+	my $buf = $self->{buf} . join("", @_);
 
-	if ($self->{in_header}) {
-		while (length $buf)
+	while (length $buf)
+	{
+		if ($self->{in_header} && $buf =~ /^\015\012/s)
 		{
-			if (substr($buf,0,2) eq "\015\012")
-			{
-				$buf = substr($buf, 2);
-				$self->finish_header();
-				$self->{in_header} = 0;
-				last;
-			}
-			if ($buf !~ /^(.+?\015\012)[^\ \t]/s)
-			{
-				last;
-			}
+			$buf = substr($buf, 2);
+			$self->finish_header();
+			$self->{in_header} = 0;
+			next;
+		}
+		elsif ($self->{in_header} && $buf =~ /^(.*?\015\012)[^\ \t]/s)
+		{
 			my $header = $1;
-			$self->add_header($header);
 			$buf = substr($buf, length($header));
+			$self->add_header($header);
+			next;
 		}
-	}
-
-	if (!$self->{in_header}) {
-		my $j = rindex($buf,"\015\012");
-		if ($j >= 0)
+		elsif (!$self->{in_header} && $buf =~ /^(.*?\015\012)/s)
 		{
-			$self->add_body(substr($buf, 0, $j+2));
-			substr($buf, 0, $j+2) = '';
+			my $body_line = $1;
+			$buf = substr($buf, length($body_line));
+			$self->add_body($body_line);
+			next;
 		}
+		last;
 	}
 	$self->{buf} = $buf;
 	return 1;

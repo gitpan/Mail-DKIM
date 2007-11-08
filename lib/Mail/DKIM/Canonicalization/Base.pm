@@ -36,24 +36,24 @@ sub init
 sub output
 {
 	my $self = shift;
-	# my ($output) = @_;  # optimized away for speed
+	my ($output) = @_;
 
 	my $out_fh = $self->{output_fh};
 	if ($out_fh)
 	{
-		print $out_fh @_;
+		print $out_fh $output;
 	}
 	if (my $digest = $self->{output_digest})
 	{
-		$digest->add(@_);
+		$digest->add($output);
 	}
 	if (my $out_obj = $self->{output})
 	{
-		$out_obj->PRINT(@_);
+		$out_obj->PRINT($output);
 	}
 	if (my $buffer = $self->{buffer})
 	{
-		${$self->{buffer}} .= $_[0];
+		${$self->{buffer}} .= $output;
 	}
 
 	# this supports Debug_Canonicalization
@@ -61,15 +61,15 @@ sub output
 	{
 		if (UNIVERSAL::isa($debug, "SCALAR"))
 		{
-			$$debug .= $_[0];
+			$$debug .= $output;
 		}
 		elsif (UNIVERSAL::isa($debug, "GLOB"))
 		{
-			print $debug @_;
+			print $debug $output;
 		}
 		elsif (UNIVERSAL::isa($debug, "IO::Handle"))
 		{
-			$debug->print(@_);
+			$debug->print($output);
 		}
 	}
 }

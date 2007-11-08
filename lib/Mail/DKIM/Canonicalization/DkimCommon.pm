@@ -100,25 +100,24 @@ sub finish_header
 sub add_body
 {
 	my $self = shift;
-	my ($multiline) = @_;
+	my ($line) = @_;
 
-	$multiline = $self->canonicalize_body($multiline);
+	$line = $self->canonicalize_body($line);
 	if ($self->{Signature})
 	{
 		if (my $limit = $self->{Signature}->body_count)
 		{
 			my $remaining = $limit - $self->{body_count};
-			if (length($multiline) > $remaining)
+			if (length($line) > $remaining)
 			{
-				$self->{body_truncated} +=
-					length($multiline) - $remaining;
-				$multiline = substr($multiline, 0, $remaining);
+				$self->{body_truncated} += length($line) - $remaining;
+				$line = substr($line, 0, $remaining);
 			}
 		}
 	}
 
-	$self->{body_count} += length($multiline);
-	$self->output($multiline);
+	$self->{body_count} += length($line);
+	$self->output($line);
 }
 
 sub finish_body
