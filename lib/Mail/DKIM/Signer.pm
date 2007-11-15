@@ -69,10 +69,14 @@ Mail::DKIM::Signer - generates a DKIM signature for a message
 
 The "default policy" is to create a DKIM signature using the specified
 parameters, but only if the message's sender matches the domain.
+The following parameters can be passed to this new() method to
+influence the resulting signature:
+Algorithm, Method, Domain, Selector, KeyFile, Identity, Timestamp.
+
 If you want different behavior, you can provide a "signer policy"
 instead. A signer policy is a subroutine or class that determines
 signature parameters after the message's headers have been parsed.
-See the section "SIGNER POLICIES" below for more information.
+See the section L</"SIGNER POLICIES"> below for more information.
 
 See L<Mail::DKIM::SignerPolicy> for more information about policy objects.
 
@@ -81,7 +85,7 @@ See L<Mail::DKIM::SignerPolicy> for more information about policy objects.
 package Mail::DKIM::Signer;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 # PROPERTIES
 #
@@ -208,7 +212,7 @@ sub finish_header
 		}
 
 		$self->add_signature(
-			new Mail::DKIM::Signature(
+			Mail::DKIM::Signature->new(
 				Algorithm => $self->{"Algorithm"},
 				Method => $self->{"Method"},
 				Headers => $self->headers,
@@ -218,6 +222,8 @@ sub finish_header
 				KeyFile => $self->{"KeyFile"},
 				($self->{"Identity"} ?
 					(Identity => $self->{"Identity"}) : ()),
+				($self->{"Timestamp"} ?
+					(Timestamp => $self->{"Timestamp"}) : ()),
 			));
 	}
 
@@ -468,22 +474,29 @@ sub method
 
   my $address = $dkim->message_originator;
 
-Returns the "originator address" found in the message. This is typically
-the (first) name and email address found in the From: header. The returned
-object is of type L<Mail::Address>. To get just the email address part, do:
+Returns the "originator address" found in the message, as a
+L<Mail::Address> object.
+This is typically the (first) name and email address found in the
+From: header. If there is no From: header,
+then an empty L<Mail::Address> object is returned.
+
+To get just the email address part, do:
 
   my $email = $dkim->message_originator->address;
 
+See also L</"message_sender()">.
 
 =head2 message_sender() - access the "From" or "Sender" header
 
   my $address = $dkim->message_sender;
 
-Returns the "sender" found in the message. This is typically the (first)
-name and email address found in the Sender: header. If there is no Sender:
-header, it is the first name and email address in the From: header.
-The returned object is of type Mail::Address, so to get just the email
-address part, do:
+Returns the "sender" found in the message, as a L<Mail::Address> object.
+This is typically the (first) name and email address found in the
+Sender: header. If there is no Sender: header, it is the first name and
+email address in the From: header. If neither header is present,
+then an empty L<Mail::Address> object is returned.
+
+To get just the email address part, do:
 
   my $email = $dkim->message_sender->address;
 

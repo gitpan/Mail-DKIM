@@ -18,7 +18,7 @@ sub init
 	my $self = shift;
 	$self->SUPER::init;
 
-	$self->{canonicalize_body_buf} = "";
+	$self->{canonicalize_body_empty_lines} = 0;
 }
 
 sub canonicalize_header
@@ -33,26 +33,33 @@ sub canonicalize_header
 sub canonicalize_body
 {
 	my $self = shift;
-	my ($line) = @_;
+	my ($multiline) = @_;
 
 	# ignore empty lines at the end of the message body
-
 	#
 	# (i.e. do not emit empty lines until a following nonempty line
 	# is found)
 	#
-	if ($line eq "\015\012")
-	{
-		$self->{canonicalize_body_buf} .= $line;
-		$line = "";
-	}
-	else
-	{
-		$line = $self->{canonicalize_body_buf} . $line;
-		$self->{canonicalize_body_buf} = "";
+	my $empty_lines = $self->{canonicalize_body_empty_lines};
+
+	if ( $multiline =~ s/^((?:\015\012)+)// )
+	{	# count & strip leading empty lines
+		$empty_lines += length($1)/2;
 	}
 
-	return $line;
+	if ($empty_lines > 0 && length($multiline) > 0)
+	{	# re-insert leading white if any nonempty lines exist
+		$multiline = ("\015\012" x $empty_lines) . $multiline;
+		$empty_lines = 0;
+	}
+
+	if ($multiline =~ s/((?:\015\012){2,})\z/\015\012/)
+	{	# count & strip trailing empty lines
+		$empty_lines += length($1)/2 - 1;
+	}
+
+	$self->{canonicalize_body_empty_lines} = $empty_lines;
+	return $multiline;
 }
 
 1;

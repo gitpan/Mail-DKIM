@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Copyright 2005 Messiah College. All rights reserved.
+# Copyright 2005-2007 Messiah College. All rights reserved.
 # Jason Long <jlong@messiah.edu>
 
 # Copyright (c) 2004 Anthony D. Urso. All rights reserved.
@@ -48,7 +48,7 @@ sub finish_header
 	# the headers will be canonicalized in reverse order (i.e. "from
 	# the bottom of the header field block to the top").
 	#
-	# This is described in 5.4 of draft-allman-dkim-base-01.
+	# This is described in 5.4 of RFC4871.
 
 	# Since the bottom-most headers are to get precedence, we reverse
 	# the headers here... (now the first header matching a particular
@@ -100,24 +100,25 @@ sub finish_header
 sub add_body
 {
 	my $self = shift;
-	my ($line) = @_;
+	my ($multiline) = @_;
 
-	$line = $self->canonicalize_body($line);
+	$multiline = $self->canonicalize_body($multiline);
 	if ($self->{Signature})
 	{
 		if (my $limit = $self->{Signature}->body_count)
 		{
 			my $remaining = $limit - $self->{body_count};
-			if (length($line) > $remaining)
+			if (length($multiline) > $remaining)
 			{
-				$self->{body_truncated} += length($line) - $remaining;
-				$line = substr($line, 0, $remaining);
+				$self->{body_truncated} +=
+					length($multiline) - $remaining;
+				$multiline = substr($multiline, 0, $remaining);
 			}
 		}
 	}
 
-	$self->{body_count} += length($line);
-	$self->output($line);
+	$self->{body_count} += length($multiline);
+	$self->output($multiline);
 }
 
 sub finish_body

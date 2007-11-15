@@ -89,7 +89,7 @@ is written to the referenced string or file handle.
 package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = '0.29';
+our $VERSION = '0.30';
 
 sub init
 {
@@ -198,8 +198,8 @@ sub check_signature
 		# unsupported version
 		if (defined $signature->version)
 		{
-			$self->{signature_reject_reason} = "unsupported version (v="
-				. $signature->version . ")";
+			$self->{signature_reject_reason} = "unsupported version "
+				. $signature->version;
 		}
 		else
 		{
@@ -299,13 +299,22 @@ sub check_public_key
 	{
 		$@ = undef;
 
+		# HACK- I'm indecisive here about whether I want the
+		# check_foo functions to return false or to "die"
+		# on failure
+
 		# check public key's allowed hash algorithms
 		$result = $public_key->check_hash_algorithm(
 				$signature->hash_algorithm);
 
+		# HACK- DomainKeys signatures are allowed to have an empty g=
+		# tag in the public key
+		my $empty_g_means_wildcard = $signature->isa("Mail::DKIM::DkSignature");
+
 		# check public key's granularity
 		$result &&= $public_key->check_granularity(
-				$signature->identity);
+				$signature->identity, $empty_g_means_wildcard);
+
 		die $@ if $@;
 	};
 	if ($@)
@@ -367,6 +376,13 @@ sub finish_header
 	my @valid = ();
 	foreach my $signature (@{$self->{signatures}})
 	{
+		# DomainKeys signatures take the "identity" of the
+		# message "sender"
+		if ($signature->can("init_identity"))
+		{
+			$signature->init_identity($self->message_sender->address);
+		}
+
 		unless ($self->check_signature($signature))
 		{
 			$signature->result("invalid",
@@ -566,10 +582,8 @@ sub fetch_sender_policy
 	use Mail::DKIM::Policy;
 
 	# determine addresses found in the "From" and "Sender" headers
-	my $author = $self->message_originator;
-	$author &&= $author->address;
-	my $sender = $self->message_sender;
-	$sender &&= $sender->address;
+	my $author = $self->message_originator->address;
+	my $sender = $self->message_sender->address;
 
 	# fetch the policy
 	return Mail::DKIM::Policy->fetch(
@@ -591,21 +605,29 @@ terminators (same as the SMTP protocol).
 
   my $address = $dkim->message_originator;
 
-Returns the "originator address" found in the message. This is typically
-the (first) name and email address found in the From: header. The returned
-object is of type Mail::Address. To get just the email address part, do:
+Returns the "originator address" found in the message, as a
+L<Mail::Address> object.
+This is typically the (first) name and email address found in the
+From: header. If there is no From: header,
+then an empty L<Mail::Address> object is returned.
+
+To get just the email address part, do:
 
   my $email = $dkim->message_originator->address;
+
+See also L</"message_sender()">.
 
 =head2 message_sender() - access the "From" or "Sender" header
 
   my $address = $dkim->message_sender;
 
-Returns the "sender" found in the message. This is typically the (first)
-name and email address found in the Sender: header. If there is no Sender:
-header, it is the first name and email address in the From: header.
-The returned object is of type Mail::Address, so to get just the email
-address part, do:
+Returns the "sender" found in the message, as a L<Mail::Address> object.
+This is typically the (first) name and email address found in the
+Sender: header. If there is no Sender: header, it is the first name and
+email address in the From: header. If neither header is present,
+then an empty L<Mail::Address> object is returned.
+
+To get just the email address part, do:
 
   my $email = $dkim->message_sender->address;
 
@@ -671,7 +693,7 @@ The following are possible results from the result_detail() method:
   invalid (missing q tag)
   invalid (missing d tag)
   invalid (missing s tag)
-  invalid (unsupported v=0.1 tag)
+  invalid (unsupported version 0.1)
   invalid (no public key available)
   invalid (public key: unsupported version)
   invalid (public key: unsupported key type)

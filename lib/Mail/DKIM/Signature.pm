@@ -35,6 +35,7 @@ Mail::DKIM::Signature - represents a DKIM-Signature header
                       [ Headers => "from:subject:date:message-id", ]
                       [ Query => "dns", ]
                       [ Selector => "alpha", ]
+                      [ Timestamp => time(), ]
                       [ Expiration => time() + 86400, ]
                   );
 
@@ -56,6 +57,7 @@ sub new
 	$self->protocol($prms{'Query'} || "dns/txt");
 	$self->selector($prms{'Selector'});
 	$self->identity($prms{'Identity'}) if exists $prms{'Identity'};
+	$self->timestamp($prms{'Timestamp'}) if defined $prms{'Timestamp'};
 	$self->expiration($prms{'Expiration'}) if defined $prms{'Expiration'};
 
 	return $self;
@@ -713,6 +715,8 @@ sub selector {
 This method may alter the signature in a way that breaks signatures, so
 it should be done ONLY when the signature is being generated, BEFORE being
 fed to the canonicalization algorithm.
+
+See also prettify_safe(), which will not break signatures.
 
 =cut
 

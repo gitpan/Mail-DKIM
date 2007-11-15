@@ -36,24 +36,24 @@ sub init
 sub output
 {
 	my $self = shift;
-	my ($output) = @_;
+	# my ($output) = @_;  # optimized away for speed
 
 	my $out_fh = $self->{output_fh};
 	if ($out_fh)
 	{
-		print $out_fh $output;
+		print $out_fh @_;
 	}
 	if (my $digest = $self->{output_digest})
 	{
-		$digest->add($output);
+		$digest->add(@_);
 	}
 	if (my $out_obj = $self->{output})
 	{
-		$out_obj->PRINT($output);
+		$out_obj->PRINT(@_);
 	}
 	if (my $buffer = $self->{buffer})
 	{
-		${$self->{buffer}} .= $output;
+		${$self->{buffer}} .= $_[0];
 	}
 
 	# this supports Debug_Canonicalization
@@ -61,15 +61,15 @@ sub output
 	{
 		if (UNIVERSAL::isa($debug, "SCALAR"))
 		{
-			$$debug .= $output;
+			$$debug .= $_[0];
 		}
 		elsif (UNIVERSAL::isa($debug, "GLOB"))
 		{
-			print $debug $output;
+			print $debug @_;
 		}
 		elsif (UNIVERSAL::isa($debug, "IO::Handle"))
 		{
-			$debug->print($output);
+			$debug->print(@_);
 		}
 	}
 }
@@ -101,7 +101,7 @@ Mail::DKIM::Canonicalization::Base - base class for canonicalization methods
 
   # add body
   $method->add_body("This is the body.\015\012");
-  $method->add_body("Another line of the body.\015\012");
+  $method->add_body("Another two lines\015\012of the body.\015\012");
   $method->finish_body;
 
   # this adds the signature to the end
@@ -153,9 +153,10 @@ can be accessed using the result() method.
 =head2 add_body() - feeds part of the body into the canonicalization
 
   $method->add_body("This is the body.\015\012");
-  $method->add_body("Another line of the body.\015\012");
+  $method->add_body("Another two lines\015\012of the body.\015\012");
 
-The body should be fed one "line" at a time.
+The body should be fed one or more "lines" at a time.
+I.e. do not feed part of a line.
 
 =head2 result()
 

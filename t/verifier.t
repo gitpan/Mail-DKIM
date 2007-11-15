@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 61;
+use Test::More tests => 67;
 
 use Mail::DKIM::Verifier;
 
@@ -74,8 +74,12 @@ test_email("good_dk_gmail.txt", "pass");
 test_email("good_dk_yahoo.txt", "pass");
 test_email("good_dk_1.txt", "pass");
 test_email("good_dk_2.txt", "pass");
+test_email("good_dk_3.txt", "pass"); # key with g= tag (ident in From header)
+test_email("good_dk_4.txt", "pass"); # key with g= tag (ident in Sender head)
+test_email("good_dk_5.txt", "pass"); # key with empty g=
 test_email("dk_headers_1.txt", "pass");
-test_email("dk_headers_2.txt", "pass");
+test_email("bad_dk_1.txt", "invalid"); # sig. domain != From header (no Sender)
+test_email("bad_dk_2.txt", "invalid"); # sig. domain != Sender header
 
 # test empty/missing body - simple canonicalization
 test_email("no_body_1.txt", "pass");
@@ -100,6 +104,7 @@ test_email("ignore_8.txt", "invalid"); # bad i= value
 test_email("goodkey_1.txt", "pass"); # public key with s=email
 test_email("goodkey_2.txt", "pass"); # public key with extra tags, h=, s=, etc.
 test_email("goodkey_3.txt", "pass"); # public key with g=jl*g
+test_email("goodkey_4.txt", "pass"); # public key with implied g
 
 #
 # test problems with the public key
@@ -114,6 +119,7 @@ test_email("badkey_7.txt", "invalid"); # public key unsupported h= tag
 test_email("badkey_8.txt", "invalid"); # public key unmatched g= tag
 test_email("badkey_9.txt", "invalid"); # public key empty g= tag
 test_email("badkey_10.txt", "invalid"); # public key requires i == d
+test_email("badkey_11.txt", "invalid"); # public key unmatched h= tag
 
 
 sub read_file

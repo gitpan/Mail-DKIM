@@ -10,6 +10,7 @@ use strict;
 use warnings;
 
 use Mail::DKIM::Signer;
+use Mail::DKIM::TextWrap;
 use Getopt::Long;
 use Pod::Usage;
 
@@ -17,6 +18,7 @@ my $type = "dkim";
 my $selector = "selector1";
 my $algorithm = "rsa-sha1";
 my $method = "simple";
+my $domain; # undef => auto-select domain
 my $expiration;
 my $identity;
 my $key_protocol;
@@ -29,6 +31,7 @@ GetOptions(
 		"algorithm=s" => \$algorithm,
 		"method=s" => \$method,
 		"selector=s" => \$selector,
+		"domain=s" => \$domain,
 		"expiration=i" => \$expiration,
 		"identity=s" => \$identity,
 		"key-protocol=s" => \$key_protocol,
@@ -87,10 +90,11 @@ sub signer_policy
 
 	use Mail::DKIM::DkSignature;
 
-	$dkim->domain($dkim->message_sender->host);
+	$dkim->domain($domain || $dkim->message_sender->host);
 
-	my $class = $type eq "domainkeys" ? "Mail::DKIM::DkSignature"
-		: "Mail::DKIM::Signature";
+	my $class = $type eq "domainkeys" ? "Mail::DKIM::DkSignature" :
+			$type eq "dkim" ? "Mail::DKIM::Signature" :
+				die "unknown signature type '$type'\n";
 	my $sig = $class->new(
 			Algorithm => $dkim->algorithm,
 			Method => $dkim->method,
