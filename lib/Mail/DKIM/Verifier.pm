@@ -131,12 +131,40 @@ sub handle_header
 
 	if (lc($field_name) eq "dkim-signature")
 	{
-		$self->add_signature($line);
+		eval
+		{
+			my $signature = Mail::DKIM::Signature->parse($line);
+			$self->add_signature($signature);
+		};
+		if ($@)
+		{
+			# the only reason an error should be thrown is if the
+			# signature really is unparse-able
+
+			# otherwise, invalid signatures are caught in finish_header()
+
+			chomp (my $E = $@);
+			$self->{signature_reject_reason} = $E;
+		}
 	}
 
 	if (lc($field_name) eq "domainkey-signature")
 	{
-		$self->add_signature_dk($line);
+		eval
+		{
+			my $signature = Mail::DKIM::DkSignature->parse($line);
+			$self->add_signature($signature);
+		};
+		if ($@)
+		{
+			# the only reason an error should be thrown is if the
+			# signature really is unparse-able
+
+			# otherwise, invalid signatures are caught in finish_header()
+
+			chomp (my $E = $@);
+			$self->{signature_reject_reason} = $E;
+		}
 	}
 }
 
@@ -144,47 +172,28 @@ sub add_signature
 {
 	my $self = shift;
 	croak "wrong number of arguments" unless (@_ == 1);
-	my ($contents) = @_;
+	my ($signature) = @_;
 
-	eval
+	push @{$self->{signatures}}, $signature;
+
+	unless ($self->check_signature($signature))
 	{
-		my $signature = Mail::DKIM::Signature->parse($contents);
-		push @{$self->{signatures}}, $signature;
-	};
-	if ($@)
-	{
-		# the only reason an error should be thrown is if the
-		# signature really is unparse-able
-
-		# otherwise, invalid signatures are caught in finish_header()
-
-		chomp (my $E = $@);
-		$self->{signature_reject_reason} = $E;
+		$signature->result("invalid",
+			$self->{signature_reject_reason});
+		return;
 	}
-}
 
-# parses a DomainKeys-type signature
-sub add_signature_dk
-{
-	my $self = shift;
-	croak "wrong number of arguments" unless (@_ == 1);
-	my ($contents) = @_;
+	# create a canonicalization filter and algorithm
+	my $algorithm_class = $signature->get_algorithm_class(
+				$signature->algorithm);
+	my $algorithm = $algorithm_class->new(
+				Signature => $signature,
+				Debug_Canonicalization => $self->{Debug_Canonicalization},
+			);
 
-	eval
-	{
-		my $signature = Mail::DKIM::DkSignature->parse($contents);
-		push @{$self->{signatures}}, $signature;
-	};
-	if ($@)
-	{
-		# the only reason an error should be thrown is if the
-		# signature really is unparse-able
-
-		# otherwise, invalid signatures are caught in finish_header()
-
-		chomp (my $E = $@);
-		$self->{signature_reject_reason} = $E;
-	}
+	# save the algorithm
+	$self->{algorithms} ||= [];
+	push @{$self->{algorithms}}, $algorithm;
 }
 
 sub check_signature
@@ -263,28 +272,6 @@ sub check_signature
 		return 0;
 	}
 
-	unless (check_signature_identity($signature))
-	{
-		$self->{signature_reject_reason} = "bad identity";
-		return 0;
-	}
-
-	# check domain against message From: and Sender: headers
-#	my $responsible_address = $self->message_originator;
-#	if (!$responsible_address)
-#	{
-#		# oops, no From: or Sender: header
-#		die "No From: or Sender: header";
-#	}
-#
-#	my $senderdomain = $responsible_address->host;
-#	my $sigdomain = $signature->domain;
-#	if (!match_subdomain($senderdomain, $sigdomain))
-#	{
-#		$self->{signature_reject_reason} = "unmatched domain";
-#		return 0;
-#	}
-
 	return 1;
 }
 
@@ -335,7 +322,7 @@ sub check_signature_identity
 
 	my $d = $signature->domain;
 	my $i = $signature->identity;
-	if ($i =~ /\@(.*)$/)
+	if (defined($i) && $i =~ /\@(.*)$/)
 	{
 		return match_subdomain($1, $d);
 	}
@@ -369,22 +356,20 @@ sub finish_header
 		return;
 	}
 
+	foreach my $algorithm (@{$self->{algorithms}})
+	{
+		$algorithm->finish_header;
+	}
+
 	# For each parsed signature, check it for validity. If none are valid,
 	# our result is "invalid" and our result detail will be the reason
 	# why the last signature was invalid.
 
-	my @valid = ();
 	foreach my $signature (@{$self->{signatures}})
 	{
-		# DomainKeys signatures take the "identity" of the
-		# message "sender"
-		if ($signature->can("init_identity"))
+		unless (check_signature_identity($signature))
 		{
-			$signature->init_identity($self->message_sender->address);
-		}
-
-		unless ($self->check_signature($signature))
-		{
+			$self->{signature_reject_reason} = "bad identity";
 			$signature->result("invalid",
 				$self->{signature_reject_reason});
 			next;
@@ -401,7 +386,8 @@ sub finish_header
 			my $E = $@;
 			chomp $E;
 			$self->{signature_reject_reason} = $E;
-			$signature->result("invalid", $E);
+			$signature->result("invalid",
+				$self->{signature_reject_reason});
 			next;
 		}
 
@@ -411,42 +397,21 @@ sub finish_header
 				$self->{signature_reject_reason});
 			next;
 		}
-
-		# this signature is ok
-		push @valid, $signature;
 	}
 
-	unless (@valid)
-	{
-		# no valid signatures found
-		$self->{result} = "invalid";
-		$self->{details} = $self->{signature_reject_reason};
-		return;
-	}
-
-	# now, for each valid signature, create an "algorithm" object which
-	# will process the message
-
-	$self->{algorithms} = [];
-	foreach my $signature (@valid)
-	{
-		# create a canonicalization filter and algorithm
-		my $algorithm_class = $signature->get_algorithm_class(
-					$signature->algorithm);
-		my $algorithm = $algorithm_class->new(
-					Signature => $signature,
-					Debug_Canonicalization => $self->{Debug_Canonicalization},
-				);
-
-		# output header as received so far into canonicalization
-		foreach my $line (@{$self->{headers}})
+	# stop processing signatures that are already known to be invalid
+	@{$self->{algorithms}} = grep
 		{
-			$algorithm->add_header($line);
-		}
-		$algorithm->finish_header;
+			my $sig = $_->signature;
+			!($sig->result && $sig->result eq "invalid");
+		} @{$self->{algorithms}};
 
-		# save the algorithm
-		push @{$self->{algorithms}}, $algorithm;
+	if (@{$self->{algorithms}} == 0
+		&& @{$self->{signatures}} > 0)
+	{
+		$self->{result} = $self->{signatures}->[0]->result;
+		$self->{details} = $self->{signatures}->[0]->{verify_details};
+		return;
 	}
 }
 

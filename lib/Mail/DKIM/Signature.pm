@@ -59,6 +59,7 @@ sub new
 	$self->identity($prms{'Identity'}) if exists $prms{'Identity'};
 	$self->timestamp($prms{'Timestamp'}) if defined $prms{'Timestamp'};
 	$self->expiration($prms{'Expiration'}) if defined $prms{'Expiration'};
+	$self->key($prms{'Key'}) if defined $prms{'Key'};
 
 	return $self;
 }
@@ -406,6 +407,10 @@ sub data
 The domain of the signing entity, as specified in the signature.
 This is the domain that will be queried for the public key.
 
+If using an "internationalized domain name", the domain name must be
+converted to ASCII (following section 4.1 of RFC 3490) before passing
+it to this method.
+
 =cut
 
 sub domain
@@ -570,6 +575,10 @@ header, or the Sender: header, but this is not required to have a
 valid signature. Whether the identity used is "authorized" to sign
 for the given message is not determined here.
 
+If using an "internationalized domain name", the domain name must be
+converted to ASCII (following section 4.1 of RFC 3490) before passing
+it to this method.
+
 =cut
 
 sub identity
@@ -606,6 +615,25 @@ sub identity_matches
 		# TODO - compare the parent domains?
 	}
 	return lc($addr) eq lc($id);
+}
+
+=head2 key() - get or set the key object
+
+  my $key = $signature->key;
+
+  $signature->key(Mail::DKIM::PrivateKey->load(File => "private.key"));
+
+=cut
+
+sub key
+{
+	my $self = shift;
+	if (@_)
+	{
+		$self->{Key} = shift;
+		$self->{KeyFile} = undef;
+	}
+	return $self->{Key};
 }
 
 =head2 method() - get or set the canonicalization (c=) field

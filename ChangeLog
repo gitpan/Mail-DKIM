@@ -1,3 +1,39 @@
+2007-12-07: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm, lib/Mail/DKIM/Algorithm/dk_rsa_sha1.pm,
+   lib/Mail/DKIM/Canonicalization/DkCommon.pm:
+   domainkeys: determine identity from algorithm object.  Currently the
+   DomainKeys identity is determined by the Verifier.  It is
+   theoretically possible for two different DomainKeys signatures on
+   the same message to have different identities.  (This happens when
+   one DomainKey signature includes a Sender header, and the other one
+   does not.) This patch moves the determination of identity to the
+   algorithm object.
+
+2007-12-07: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm, lib/Mail/DKIM/Common.pm: initialize
+   signatures early.  This patch makes Mail::DKIM::Verifier initialize
+   and check the signature object as soon as it is parsed, and
+   subsequent headers are fed into the algorithm as they are read,
+   instead of waiting for the end of header.
+ * lib/Mail/DKIM/Verifier.pm: fix DK identity.  The previous patch broke
+   identity-checking for DomainKeys signatures.  This patch moves some
+   things around so that identity checking still works.
+
+2007-12-07: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm (add_signature): changed to take a
+   signature object, instead of an unparsed header line
+
+2007-11-21: Jason Long <jlong@messiah.edu>
+ * t/corpus/bad_dk_2.txt renamed to dk_headers_2.txt: revert this
+   rename from earlier... the message should "pass" after
+   all (the Sender header was not part of the signature)
+
+2007-11-21: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Signer.pm: provide documentation for Key parameter
+ * lib/Mail/DKIM/PrivateKey.pm: created documentation for this package
+ * lib/Mail/DKIM/Signature.pm: implement Key parameter for constructor,
+   and key() method to get/set the private key
+
 2007-11-14: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Verifier.pm: for DomainKeys signatures, use the message
    sender as the identity
