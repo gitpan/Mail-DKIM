@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 67;
+use Test::More tests => 75;
 
 use Mail::DKIM::Verifier;
 
@@ -45,6 +45,7 @@ test_email("good_ietf00_5.txt", "pass");
 test_email("good_ietf01_1.txt", "pass");
 test_email("good_ietf01_2.txt", "pass");
 test_email("good_rfc4871_3.txt", "pass");  # tests extra tags in signature
+test_email("good_rfc4871_4.txt", "pass");  # case-differing domain name
 test_email("multiple_1.txt", "pass");
 test_email("multiple_2.txt", "pass");
 my @sigs = $dkim->signatures;
@@ -77,9 +78,17 @@ test_email("good_dk_2.txt", "pass");
 test_email("good_dk_3.txt", "pass"); # key with g= tag (ident in From header)
 test_email("good_dk_4.txt", "pass"); # key with g= tag (ident in Sender head)
 test_email("good_dk_5.txt", "pass"); # key with empty g=
+test_email("good_dk_6.txt", "pass"); # no h= tag
+test_email("good_dk_7.txt", "pass"); # case-differing domain names
 test_email("dk_headers_1.txt", "pass");
 test_email("dk_headers_2.txt", "pass");
 test_email("bad_dk_1.txt", "invalid"); # sig. domain != From header (no Sender)
+test_email("bad_dk_2.txt", "invalid"); # added Sender header, no h= tag
+test_email("dk_multiple_1.txt", "pass");
+my @dksigs = $dkim->signatures;
+ok(@dksigs == 2, "found two signatures");
+ok($dksigs[0]->result eq "pass", "first signature is 'pass'");
+ok($dksigs[1]->result eq "pass", "second signature is 'pass'");
 
 # test empty/missing body - simple canonicalization
 test_email("no_body_1.txt", "pass");
@@ -120,6 +129,7 @@ test_email("badkey_8.txt", "invalid"); # public key unmatched g= tag
 test_email("badkey_9.txt", "invalid"); # public key empty g= tag
 test_email("badkey_10.txt", "invalid"); # public key requires i == d
 test_email("badkey_11.txt", "invalid"); # public key unmatched h= tag
+#test_email("badkey_12.txt", "invalid"); # public key g= != i= by case
 
 
 sub read_file

@@ -1,3 +1,23 @@
+ -- VERSION 0.30 --
+
+2007-12-10: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm (is_subdomain): do case-insensitive
+   comparison
+ * t/corpus/good_dk_7.txt: tests DK signature with domain names that
+   differ only in case
+ * t/corpus/good_rfc4871_4.txt: tests DKIM signature with i= and d=
+   contain domain names differing in case
+ * t/corpus/badkey_12.txt: tests public key where i=JLong, g=jl*ng
+
+2007-12-07: Jason Long <jlong@messiah.edu>
+ * t/verifier.t: three new DK tests
+ * t/corpus/good_dk_6.txt: tests DK signature without h= tag
+ * t/corpus/bad_dk_2.txt: tests DK signature w/o h= tag, Sender has
+   been added
+ * t/corpus/dk_multiple_1.txt: tests two DK signatures (with different
+   domains) in a single message... both should pass
+ * Makefile.PL: version bump
+
 2007-12-07: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Verifier.pm, lib/Mail/DKIM/Algorithm/dk_rsa_sha1.pm,
    lib/Mail/DKIM/Canonicalization/DkCommon.pm:

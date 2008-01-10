@@ -61,12 +61,17 @@ t/corpus/good_dk_2.txt
 t/corpus/good_dk_3.txt
 t/corpus/good_dk_4.txt
 t/corpus/good_dk_5.txt
+t/corpus/good_dk_6.txt
+t/corpus/good_dk_7.txt
 t/corpus/good_rfc4871_3.txt
+t/corpus/good_rfc4871_4.txt
 t/corpus/dk_headers_1.txt
 t/corpus/dk_headers_2.txt
+t/corpus/dk_multiple_1.txt
 t/corpus/multiple_1.txt
 t/corpus/multiple_2.txt
 t/corpus/bad_dk_1.txt
+t/corpus/bad_dk_2.txt
 t/corpus/bad_ietf01_1.txt
 t/corpus/bad_ietf01_2.txt
 t/corpus/bad_ietf01_3.txt
@@ -82,6 +87,7 @@ t/corpus/badkey_8.txt
 t/corpus/badkey_9.txt
 t/corpus/badkey_10.txt
 t/corpus/badkey_11.txt
+t/corpus/badkey_12.txt
 t/corpus/goodkey_1.txt
 t/corpus/goodkey_2.txt
 t/corpus/goodkey_3.txt
