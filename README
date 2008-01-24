@@ -1,5 +1,5 @@
-Mail-DKIM version 0.30
-======================
+Mail-DKIM version 0.30.1
+========================
 
 This module implements the various components of the DKIM and DomainKeys
 message-signing and verifying standards for Internet mail. It currently

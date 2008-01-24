@@ -89,7 +89,7 @@ is written to the referenced string or file handle.
 package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = '0.30';
+our $VERSION = '0.30_1';
 
 sub init
 {
@@ -190,6 +190,17 @@ sub add_signature
 				Signature => $signature,
 				Debug_Canonicalization => $self->{Debug_Canonicalization},
 			);
+
+	# push through the headers parsed prior to the signature header
+	if ($algorithm->wants_pre_signature_headers)
+	{
+		# Note: this will include the signature header that led to this
+		# "algorithm"...
+		foreach my $head (@{$self->{headers}})
+		{
+			$algorithm->add_header($head);
+		}
+	}
 
 	# save the algorithm
 	$self->{algorithms} ||= [];

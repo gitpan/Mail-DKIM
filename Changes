@@ -1,6 +1,12 @@
 This file summarizes what's changed between releases of Mail-DKIM.
 See the ChangeLog file for the details.
 
+Version 0.30.1 - released 2008-01-24
+
+ * bugfix:
+   * email from cisco.com was failing to verify (issue #1878523)
+
+
 Version 0.30 - released 2008-01-10
 
  * includes speed-up optimizations by Mark Martinec
