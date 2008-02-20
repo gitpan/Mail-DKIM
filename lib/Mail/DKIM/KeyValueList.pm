@@ -47,7 +47,7 @@ sub parse
 		my ($tagname, $value) = split(/\s*=\s*/, $raw_tag, 2);
 		unless (defined $value)
 		{
-			die "key value list syntax error\n";
+			die "syntax error\n";
 		}
 
 		$tag->{name} = $tagname;
@@ -168,6 +168,7 @@ sub wrap
 		}
 
 		$wrap->{Break} = undef;
+		$wrap->{BreakBefore} = undef;
 		$did_first ? $wrap->add(";") : ($did_first = 1);
 		$wrap->add($raw_name . "=");
 
@@ -182,6 +183,7 @@ sub wrap
 			$raw_value =~ s/^\s|\s$//g; #trims preceding/trailing spaces
 			$raw_value =~ s/\s*:\s*/:/g;
 			$wrap->{Break} = qr/[\s:]/;
+			$wrap->{BreakBefore} = qr/[:]/;
 		}
 		elsif ($tagtype eq "")
 		{

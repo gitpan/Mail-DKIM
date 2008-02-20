@@ -92,7 +92,7 @@ sub check
 	{
 		unless ($v eq "DKIM1")
 		{
-			die "public key: unsupported version\n";
+			die "unsupported version\n";
 		}
 	}
 
@@ -104,7 +104,7 @@ sub check
 	{
 		unless ($k eq "rsa")
 		{
-			die "public key: unsupported key type\n";
+			die "unsupported key type\n";
 		}
 	}
 
@@ -112,15 +112,15 @@ sub check
 	my $p = $self->data;
 	if (not defined $p)
 	{
-		die "public key: missing p= tag\n";
+		die "missing p= tag\n";
 	}
 	if ($p eq "")
 	{
-		die "public key: revoked\n";
+		die "revoked\n";
 	}
 	unless ($p =~ /^[A-Za-z0-9\+\/\=]+$/)
 	{
-		die "public key: invalid data\n";
+		die "invalid data\n";
 	}
 
 	# have OpenSSL load the key
@@ -134,11 +134,11 @@ sub check
 		chomp (my $E = $@);
 		if ($E =~ /(OpenSSL error: .*?) at /)
 		{
-			$E = "public key: $1";
+			$E = "$1";
 		}
 		elsif ($E =~ /^(panic:.*?) at /)
 		{
-			$E = "public key: OpenSSL $1";
+			$E = "OpenSSL $1";
 		}
 		die "$E\n";
 	}
@@ -149,7 +149,7 @@ sub check
 		my @list = split(/:/, $s);
 		unless (grep { $_ eq "*" || $_ eq "email" } @list)
 		{
-			die "public key: does not support email\n";
+			die "does not support email\n";
 		}
 	}
 
@@ -187,7 +187,19 @@ sub check_granularity
 	$identity = lc $identity;
 	$g = lc $g;
 
-	my ($local_part, $domain_part) = split /\@/, $identity, 2;
+	# split i= value into a "local part" and a "domain part"
+	my ($local_part, $domain_part);
+	if ($identity =~ /^(.*)\@([^@]*)$/)
+	{
+		$local_part = $1;
+		$domain_part = $2;
+	}
+	else
+	{
+		$local_part = "";
+		$domain_part = $identity;
+	}
+
 
 	my ($begins, $ends) = split /\*/, $g, 2;
 	if (defined $ends)
@@ -203,7 +215,7 @@ sub check_granularity
 		# the local part must end with $ends
 			(length($ends) && substr($local_part, -length($ends)) ne $ends))
 		{
-			$@ = "public key: granularity mismatch\n";
+			$@ = "granularity mismatch\n";
 			return;
 		}
 	}
@@ -211,12 +223,12 @@ sub check_granularity
 	{
 		if ($g eq "")
 		{
-			$@ = "public key: granularity is empty\n";
+			$@ = "granularity is empty\n";
 			return;
 		}
 		unless ($local_part eq $begins)
 		{
-			$@ = "public key: granularity mismatch\n";
+			$@ = "granularity mismatch\n";
 			return;
 		}
 	}
@@ -226,7 +238,7 @@ sub check_granularity
 	{
 		unless ($domain_part eq lc($self->{'Domain'}))
 		{
-			$@ = "public key: does not support signing subdomains\n";
+			$@ = "does not support signing subdomains\n";
 			return;
 		}
 	}
@@ -248,7 +260,7 @@ sub check_hash_algorithm
 		my @list = split(/:/, $h);
 		unless (grep { $_ eq $hash_algorithm } @list)
 		{
-			die "public key: does not support hash algorithm '$hash_algorithm'\n";
+			die "does not support hash algorithm '$hash_algorithm'\n";
 		}
 	}
 	return 1;

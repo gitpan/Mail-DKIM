@@ -31,6 +31,7 @@ Mail::DKIM::PrivateKey - a private key loaded in memory for DKIM signing
 
 package Mail::DKIM::PrivateKey;
 use base "Mail::DKIM::Key";
+use Carp;
 *calculate_EM = \&Mail::DKIM::Key::calculate_EM;
 
 =head1 CONSTRUCTOR
@@ -48,11 +49,12 @@ Loads the Base64-encoded key from a string already in memory.
 
 =cut
 
-sub load {
-	my $type = shift;
+sub load
+{
+	my $class = shift;
 	my %prms = @_;
-	my $self = {};
 
+	my $self = bless {}, $class;
 
 	$self->{'TYPE'} = ($prms{'Type'} or "rsa");
 
@@ -70,10 +72,10 @@ sub load {
 		}
 		$self->{'DATA'} = join '', @data;
 	} else {
-		return;
+		croak "missing required argument";
 	}
 
-	bless $self, $type;
+	return $self;
 }
 
 sub convert {

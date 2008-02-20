@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 76;
+use Test::More tests => 79;
 
 use Mail::DKIM::Verifier;
 
@@ -70,6 +70,7 @@ SKIP:
 		qr/OpenSSL/i,
 		"determined OpenSSL error");
 }
+test_email("bad_1878954.txt", "fail");  # shouldn't die
 
 # test older DomainKeys messages, from Gmail and Yahoo!
 test_email("good_dk_gmail.txt", "pass");
@@ -123,6 +124,7 @@ test_email("badkey_1.txt", "invalid"); # public key NXDOMAIN
 test_email("badkey_2.txt", "invalid"); # public key REVOKED
 test_email("badkey_3.txt", "invalid"); # public key unsupported v= tag
 test_email("badkey_4.txt", "invalid"); # public key syntax error
+ok($dkim->result_detail =~ /public key/, "detail mentions public key");
 test_email("badkey_5.txt", "invalid"); # public key unsupported k= tag
 test_email("badkey_6.txt", "invalid"); # public key unsupported s= tag
 test_email("badkey_7.txt", "invalid"); # public key unsupported h= tag
@@ -130,7 +132,11 @@ test_email("badkey_8.txt", "invalid"); # public key unmatched g= tag
 test_email("badkey_9.txt", "invalid"); # public key empty g= tag
 test_email("badkey_10.txt", "invalid"); # public key requires i == d
 test_email("badkey_11.txt", "invalid"); # public key unmatched h= tag
-#test_email("badkey_12.txt", "invalid"); # public key g= != i= by case
+TODO:
+{
+	local $TODO = "not fixed yet";
+	test_email("badkey_12.txt", "invalid"); # public key g= != i= by case
+};
 
 
 sub read_file

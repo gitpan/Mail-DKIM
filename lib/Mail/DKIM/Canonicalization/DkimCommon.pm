@@ -21,12 +21,14 @@ sub init
 
 	$self->{body_count} = 0;
 	$self->{body_truncated} = 0;
+	$self->{myheaders} = [];
 
 	# these canonicalization methods require signature to use
 	$self->{Signature}
 		or croak "no signature specified";
 }
 
+# similar to code in DkCommon.pm
 sub add_header
 {
 	my $self = shift;

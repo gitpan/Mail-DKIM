@@ -89,7 +89,7 @@ is written to the referenced string or file handle.
 package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = '0.30_1';
+our $VERSION = '0.31';
 
 sub init
 {
@@ -319,7 +319,7 @@ sub check_public_key
 	{
 		my $E = $@;
 		chomp $E;
-		$self->{signature_reject_reason} = $E;
+		$self->{signature_reject_reason} = "public key: $E";
 	}
 	return $result;
 }
@@ -333,7 +333,7 @@ sub check_signature_identity
 
 	my $d = $signature->domain;
 	my $i = $signature->identity;
-	if (defined($i) && $i =~ /\@(.*)$/)
+	if (defined($i) && $i =~ /\@([^@]*)$/)
 	{
 		return match_subdomain($1, $d);
 	}
@@ -396,7 +396,7 @@ sub finish_header
 		{
 			my $E = $@;
 			chomp $E;
-			$self->{signature_reject_reason} = $E;
+			$self->{signature_reject_reason} = "public key: $E";
 			$signature->result("invalid",
 				$self->{signature_reject_reason});
 			next;
@@ -519,11 +519,11 @@ The result of the apply() method is one of: "accept", "reject", "neutral".
 sub fetch_author_policy
 {
 	my $self = shift;
+	my ($author) = @_;
 	use Mail::DKIM::DkimPolicy;
 
 	# determine address found in the "From"
-	my $author = $self->message_originator;
-	$author &&= $author->address;
+	$author ||= $self->message_originator->address;
 
 	# fetch the policy
 	return Mail::DKIM::DkimPolicy->fetch(
@@ -633,10 +633,8 @@ does not contain a correct value for the message.
 
 =item invalid
 
-Returned if no valid DKIM-Signature headers were found, but there is at
-least one invalid DKIM-Signature header. For a reason why a
-DKIM-Signature header found in the message was invalid,
-see $dkim->{signature_reject_reason}.
+Returned if a DKIM-Signature could not be checked because of a problem
+in the signature itself or the public key record.
 
 =item none
 
@@ -661,16 +659,22 @@ The following are possible results from the result_detail() method:
 
   pass
   fail (bad RSA signature)
-  fail (headers have been altered)
+  fail (OpenSSL error: ...)
+  fail (message has been altered)
   fail (body has been altered)
-  invalid (unsupported canonicalization)
-  invalid (unsupported query protocol)
+  invalid (bad identity)
   invalid (invalid domain in d tag)
   invalid (missing q tag)
   invalid (missing d tag)
   invalid (missing s tag)
   invalid (unsupported version 0.1)
-  invalid (no public key available)
+  invalid (unsupported algorithm ...)
+  invalid (unsupported canonicalization ...)
+  invalid (unsupported query protocol ...)
+  invalid (signature is expired)
+  invalid (public key: not available)
+  invalid (public key: unknown query type ...)
+  invalid (public key: syntax error)
   invalid (public key: unsupported version)
   invalid (public key: unsupported key type)
   invalid (public key: missing p= tag)
