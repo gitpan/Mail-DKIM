@@ -399,6 +399,33 @@ sub data
 
 *signature = \*data;
 
+#undocumented, private function
+#derived from MIME::Base64::Perl (allowed, thanks to the Perl license)
+#
+sub decode_qp
+{
+	my $res = shift;
+
+	#TODO- should I worry about non-ASCII systems here?
+	$res =~ s/=([\da-fA-F]{2})/pack("C", hex($1))/ge;
+	return $res;
+}
+
+#undocumented, private function
+#derived from MIME::Base64::Perl (allowed, thanks to the Perl license)
+#
+sub encode_qp
+{
+	my $res = shift;
+
+	# note- unlike MIME quoted-printable, we don't allow whitespace chars
+	my $DISALLOWED = qr/[^!"#\$%&'()*+,\-.\/0-9:;<>?\@A-Z[\\\]^_`a-z{|}~]/;
+
+	#TODO- should I worry about non-ASCII systems here?
+	$res =~ s/($DISALLOWED)/sprintf('=%02X', ord($1))/eg;
+	return $res;
+}
+
 =head2 domain() - get or set the domain (d=) field
 
   my $d = $signature->domain;          # gets the domain value
@@ -502,6 +529,19 @@ sub get_public_key
 	return $self->{public};
 }
 
+=head2 get_tag() - access the raw value of a tag in this signature
+
+  my $raw_identity = $signature->get_tag("i");
+
+Use this method to access a tag not already supported by Mail::DKIM,
+or if you want to bypass decoding of the value by Mail::DKIM.
+
+For example, the raw i= (identity) tag is encoded in quoted-printable
+form. If you use the identity() method, Mail::DKIM will decode from
+quoted-printable before returning the value. But if you use
+get_tag("i"), you can access the encoded quoted-printable form of
+the value.
+
 =head2 hash_algorithm() - access the hash algorithm specified in this signature
 
   my $hash = $signature->hash_algorithm;
@@ -587,6 +627,11 @@ If using an "internationalized domain name", the domain name must be
 converted to ASCII (following section 4.1 of RFC 3490) before passing
 it to this method.
 
+Identity values are encoded in the signature in quoted-printable format.
+Using this method will translate to/from quoted-printable as necessary.
+If you want the raw quoted-printable version of the identity, use
+$signature->get_tag("i").
+
 =cut
 
 sub identity
@@ -595,12 +640,12 @@ sub identity
 
 	# set new identity if provided
 	(@_) and
-		$self->set_tag("i", shift);
+		$self->set_tag("i", encode_qp(shift));
 
 	my $i = $self->get_tag("i");
 	if (defined $i)
 	{
-		return $i;
+		return decode_qp($i);
 	}
 	else
 	{

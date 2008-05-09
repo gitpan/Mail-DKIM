@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 79;
+use Test::More tests => 83;
 
 use Mail::DKIM::Verifier;
 
@@ -53,6 +53,9 @@ my @sigs = $dkim->signatures;
 ok($sigs[0]->result eq "invalid", "first signature is 'invalid'");
 ok($sigs[1]->result eq "pass", "second signature is 'pass'");
 ok($sigs[2]->result eq "fail", "third signature is 'fail'");
+test_email("good_qp_1.txt", "pass");   # tests i= quoted-printable value
+test_email("good_qp_2.txt", "pass");   # tests i= quoted-printable value
+test_email("good_qp_3.txt", "pass");   # tests i= quoted-printable value
 
 test_email("bad_ietf01_1.txt", "fail");
 ok($dkim->result_detail =~ /body/, "determined body had been altered");
@@ -132,11 +135,8 @@ test_email("badkey_8.txt", "invalid"); # public key unmatched g= tag
 test_email("badkey_9.txt", "invalid"); # public key empty g= tag
 test_email("badkey_10.txt", "invalid"); # public key requires i == d
 test_email("badkey_11.txt", "invalid"); # public key unmatched h= tag
-TODO:
-{
-	local $TODO = "not fixed yet";
-	test_email("badkey_12.txt", "invalid"); # public key g= != i= by case
-};
+test_email("badkey_12.txt", "invalid"); # public key g= != i= by case
+test_email("badkey_13.txt", "invalid"); # public key g= matches From but not i=
 
 
 sub read_file

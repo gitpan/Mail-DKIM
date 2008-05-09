@@ -1,4 +1,4 @@
-Mail-DKIM version 0.31
+Mail-DKIM version 0.32
 ======================
 
 This module implements the various components of the DKIM and DomainKeys
@@ -25,7 +25,6 @@ This module requires these other modules and libraries:
 
   Crypt::OpenSSL::RSA
   Digest::SHA
-  Digest::SHA1
   Mail::Address (part of the MailTools package)
   MIME::Base64
   Net::DNS
@@ -55,4 +54,4 @@ at your option, any later version of Perl 5 you may have available.
 
 SEE ALSO
 
-The DKIM proxy home page, http://jason.long.name/dkimproxy/.
+The DKIM proxy home page, http://dkimproxy.sourceforge.net/.

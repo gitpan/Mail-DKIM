@@ -1,13 +1,12 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         Mail-DKIM
-version:      0.31
+version:      0.31_8
 version_from: 
 installdirs:  site
 requires:
     Crypt::OpenSSL::RSA:           0.24
     Digest::SHA:                   0
-    Digest::SHA1:                  0
     Mail::Address:                 0
     MIME::Base64:                  0
     Net::DNS:                      0

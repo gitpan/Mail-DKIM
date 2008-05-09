@@ -18,7 +18,7 @@ package Mail::DKIM::Algorithm::dk_rsa_sha1;
 use base "Mail::DKIM::Algorithm::Base";
 use Carp;
 use MIME::Base64;
-use Digest::SHA1;
+use Digest::SHA;
 
 sub finish_header
 {
@@ -33,10 +33,14 @@ sub finish_header
 		my $author = $self->{canon}->{interesting_header}->{from};
 		$author = defined($author) && (Mail::Address->parse($author))[0];
 
-		$s->init_identity(
-			$sender ? $sender->address :
-			$author ? $author->address :
-			undef);
+		if ($sender)
+		{
+			$s->init_identity($sender->address, "header.sender");
+		}
+		elsif ($author)
+		{
+			$s->init_identity($author->address, "header.from");
+		}
 	}
 	return;
 }
@@ -79,7 +83,7 @@ sub init_digests
 	my $self = shift;
 
 	# initialize a SHA-1 Digest
-	$self->{header_digest} = new Digest::SHA1;
+	$self->{header_digest} = Digest::SHA->new(1);
 	$self->{body_digest} = $self->{header_digest};
 }
 
