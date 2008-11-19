@@ -125,6 +125,7 @@ sub new
 		Swallow => qr/\s/,
 		Separator => "\n",
 		cur => 0,
+		may_break => 0,
 		soft_space => "",
 		word => "",
 		%args,
@@ -136,6 +137,8 @@ sub new
 # Internal properties:
 #
 # cur - the last known column position
+#
+# may_break - nonzero if the current location allows a linebreak
 #
 # soft_space - contains added text that will not be printed if a linebreak
 #              occurs
@@ -200,6 +203,11 @@ sub add
 		{
 			$word = $1 . $2;
 		}
+		elsif ($self->{NoBuffering})
+		{
+			$word = $self->{word};
+			$self->{word} = "";
+		}
 		else
 		{
 			last;
@@ -208,7 +216,7 @@ sub add
 		die "assertion failed" unless length($word) >= 1;
 
 		my $next_soft_space;
-		if ($word =~ s/($swallow)$//s)
+		if (defined($swallow) && $word =~ s/($swallow)$//s)
 		{
 			$next_soft_space = $1;
 		}
@@ -220,7 +228,7 @@ sub add
 		my $to_print = $self->{soft_space} . $word;
 		my $new_pos = _calculate_new_column($self->{cur}, $to_print);
 
-		if ($new_pos > $self->{Margin})
+		if ($new_pos > $self->{Margin} && $self->{may_break})
 		{
 			# what would happen if we put the separator in?
 			my $w_sep = _calculate_new_column($self->{cur},
@@ -240,6 +248,7 @@ sub add
 		$self->output($to_print);
 		$self->{soft_space} = $next_soft_space;
 		$self->{cur} = $new_pos;
+		$self->{may_break} = 1;
 	}
 }
 
@@ -273,9 +282,10 @@ the current break pattern.
 sub flush
 {
 	my $self = shift;
-	$self->output($self->{soft_space} . $self->{word});
-	$self->{soft_space} = "";
-	$self->{word} = "";
+
+	local $self->{NoBuffering} = 1;
+	local $self->{Swallow} = undef;
+	$self->add("");
 }
 
 sub output
