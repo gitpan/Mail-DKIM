@@ -35,9 +35,6 @@ sub init
 	croak "no signature" unless $self->{Signature};
 
 	$self->{mode} = $self->{Signature}->signature ? "verify" : "sign";
-	$self->{draft_version} ||=
-		($self->{mode} eq "sign" ? "01" :
-		 $self->{Signature}->body_hash ? "01" : "00");
 
 	# allows subclasses to set the header_digest and body_digest
 	# properties
@@ -50,12 +47,10 @@ sub init
 	my $body_class = $self->get_canonicalization_class($body_method);
 	$self->{canon} = $header_class->new(
 			output_digest => $self->{header_digest},
-			draft_version => $self->{draft_version},
 			Signature => $self->{Signature},
 			Debug_Canonicalization => $self->{Debug_Canonicalization});
 	$self->{body_canon} = $body_class->new(
 			output_digest => $self->{body_digest},
-			draft_version => $self->{draft_version},
 			Signature => $self->{Signature},
 			Debug_Canonicalization => $self->{Debug_Canonicalization});
 }
@@ -215,14 +210,11 @@ sub finish_message
 	# But first, we need to set the bh= tag on the signature, then
 	# "prettify" it.
 
-	if ($self->{draft_version} eq "01")
+	$self->{body_hash} = $self->{body_digest}->digest;
+	if ($self->{mode} eq "sign")
 	{
-		$self->{body_hash} = $self->{body_digest}->digest;
-		if ($self->{mode} eq "sign")
-		{
-			$self->{Signature}->body_hash(
-					encode_base64($self->{body_hash}, ""));
-		}
+		$self->{Signature}->body_hash(
+				encode_base64($self->{body_hash}, ""));
 	}
 
 	if ($self->{mode} eq "sign")
@@ -232,11 +224,6 @@ sub finish_message
 
 	my $sig_line = $self->{Signature}->as_string_without_data;
 	my $canonicalized = $self->{canon}->canonicalize_header($sig_line);
-
-	if ($self->{draft_version} eq "00")
-	{
-		$canonicalized = "\015\012" . $canonicalized;
-	}
 
 	$self->{canon}->output($canonicalized);
 }
