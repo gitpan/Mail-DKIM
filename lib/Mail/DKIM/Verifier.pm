@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Copyright 2005-2007 Messiah College. All rights reserved.
+# Copyright 2005-2009 Messiah College. All rights reserved.
 # Jason Long <jlong@messiah.edu>
 
 # Copyright (c) 2004 Anthony D. Urso. All rights reserved.
@@ -532,6 +532,26 @@ sub fetch_author_policy
 			);
 }
 
+sub fetch_author_domain_policies
+{
+	my $self = shift;
+	use Mail::DKIM::AuthorDomainPolicy;
+
+	return () unless $self->{headers_by_name}->{from};
+	my @list = Mail::Address->parse(
+		$self->{headers_by_name}->{from}
+		);
+	my @authors = map { $_->address } @list;
+
+	# fetch the policies
+	return map {
+		Mail::DKIM::DkimPolicy->fetch(
+			Protocol => "dns",
+			Author => $_,
+			)
+		} @authors;
+}
+
 =head2 fetch_sender_policy() - retrieves a signing policy from DNS
 
   my $policy = $dkim->fetch_sender_policy;
@@ -555,14 +575,14 @@ The result of the apply() method is one of: "accept", "reject", "neutral".
 sub fetch_sender_policy
 {
 	my $self = shift;
-	use Mail::DKIM::Policy;
+	use Mail::DKIM::DkPolicy;
 
 	# determine addresses found in the "From" and "Sender" headers
 	my $author = $self->message_originator->address;
 	my $sender = $self->message_sender->address;
 
 	# fetch the policy
-	return Mail::DKIM::Policy->fetch(
+	return Mail::DKIM::DkPolicy->fetch(
 			Protocol => "dns",
 			Author => $author,
 			Sender => $sender,
@@ -612,6 +632,44 @@ transmission of the message. For example, if a secretary were to send a
 message for another person, the "sender" would be the secretary and
 the "originator" would be the actual author.
 
+=head2 policies() - retrieves applicable signing policies from DNS
+
+  my @policies = $dkim->policies;
+  foreach my $policy (@policies)
+  {
+      $policy_result = $policy->apply($dkim);
+      # $policy_result is one of "accept", "reject", "neutral"
+  }
+
+This method searches for and returns any signing policies that would
+apply to this message. Signing policies are selected based on the
+domain that the message *claims* to be from. So, for example, if
+a message claims to be from security@bank, and forwarded by
+trusted@listserv, when in reality the message came from foe@evilcorp,
+this method would check for signing policies for security@bank and
+trusted@listserv. The signing policies might tell whether
+foe@evilcorp (the real sender) is allowed to send mail claiming
+to be from your bank or your listserv.
+
+I say "might tell", because in reality this is still really hard to
+specify with any accuracy. In addition, most senders do not publish
+useful policies.
+
+=cut
+
+sub policies
+{
+	my $self = shift;
+
+	my $sender_policy = eval { $self->fetch_sender_policy() };
+	my $author_policy = eval { $self->fetch_author_policy() };
+	return (
+		$sender_policy ? $sender_policy : (),
+		$author_policy ? $author_policy : (),
+		$self->fetch_author_domain_policies(),
+		);
+}
+
 
 =head2 result() - access the result of the verification
 
@@ -634,7 +692,15 @@ does not contain a correct value for the message.
 =item invalid
 
 Returned if a DKIM-Signature could not be checked because of a problem
-in the signature itself or the public key record.
+in the signature itself or the public key record. I.e. the signature
+could not be processed.
+
+=item temperror
+
+Returned if a DKIM-Signature could not be checked due to some error
+which is likely transient in nature, such as a temporary inability
+to retrieve a public key. A later attempt may produce a better
+result.
 
 =item none
 
@@ -644,6 +710,9 @@ Returned if no DKIM-Signature headers (valid or invalid) were found.
 
 In case of multiple signatures, the "best" result will be returned.
 Best is defined as "pass", followed by "fail", "invalid", and "none".
+To examine the results of individual signatures, use the L</signatures>
+method to retrieve the signature objects. See
+L<Mail::DKIM::Signature/result>.
 
 =cut
 
@@ -651,7 +720,7 @@ Best is defined as "pass", followed by "fail", "invalid", and "none".
 
   my $detail = $dkim->result_detail;
 
-The detail is constructed by taking the result (i.e. one of "pass", "fail",
+The detail is constructed by taking the result (e.g. "pass", "fail",
 "invalid" or "none") and appending any details provided by the verification
 process in parenthesis.
 
@@ -723,7 +792,7 @@ Jason Long, E<lt>jlong@messiah.eduE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2006-2007 by Messiah College
+Copyright (C) 2006-2009 by Messiah College
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.6 or,

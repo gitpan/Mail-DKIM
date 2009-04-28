@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Copyright 2005-2007 Messiah College.
+# Copyright 2005-2009 Messiah College.
 # Jason Long <jlong@messiah.edu>
 
 # Copyright (c) 2004 Anthony D. Urso. All rights reserved.
@@ -10,7 +10,7 @@
 use strict;
 use warnings;
 
-package Mail::DKIM::DkimPolicy;
+package Mail::DKIM::AuthorDomainPolicy;
 use base "Mail::DKIM::Policy";
 # base class is used for parse(), as_string()
 
@@ -18,13 +18,13 @@ use Mail::DKIM::DNS;
 
 =head1 NAME
 
-Mail::DKIM::DkimPolicy - represents a DKIM Sender Signing Practices record
+Mail::DKIM::AuthorDomainPolicy - represents an Author Domain Signing Practices (ADSP) record
 
 =head1 CONSTRUCTORS
 
-=head2 fetch() - lookup a DKIM signing practices record
+=head2 fetch() - lookup an ADSP record in DNS
 
-  my $policy = Mail::DKIM::DkimPolicy->fetch(
+  my $policy = Mail::DKIM::AuthorDomainPolicy->fetch(
             Protocol => "dns",
             Author => 'jsmith@example.org',
           );
@@ -38,7 +38,7 @@ sub get_lookup_name
 	my $self = shift;
 	my ($prms) = @_;
 
-	# in DKIM, the record to fetch is determined based on the From header
+	# in ADSP, the record to fetch is determined based on the From header
 
 	if ($prms->{Author} && !$prms->{Domain})
 	{
@@ -51,19 +51,19 @@ sub get_lookup_name
 	}
 
 	# IETF seems poised to create policy records this way
-	return "_policy._domainkey." . $prms->{Domain};
+	return "_adsp._domainkey." . $prms->{Domain};
 }
 
 =head2 new() - construct a default policy object
 
-  my $policy = Mail::DKIM::DkimPolicy->new;
+  my $policy = Mail::DKIM::AuthorDomainPolicy->new;
 
 =cut
 
 sub new
 {
 	my $class = shift;
-	return $class->parse(String => "o=~");
+	return $class->parse(String => "");
 }
 
 #undocumented private class method
@@ -115,14 +115,12 @@ sub apply
 	# an i= tag matching the address in the From: header
 	my $first_party;
 
-	#FIXME - if there are multiple verified signatures, each one
-	# should be checked
+	my @passing_signatures = grep {
+		$_->result && $_->result eq "pass"
+		} $dkim->signatures;
 
-	foreach my $signature ($dkim->signatures)
+	foreach my $signature (@passing_signatures)
 	{
-		# only valid/verified signatures are considered
-		next unless ($signature->result && $signature->result eq "pass");
-
 		my $oa = $dkim->message_originator->address;
 		if ($signature->identity_matches($oa))
 		{
@@ -132,7 +130,7 @@ sub apply
 		}
 	}
 
-	#TODO - consider testing flag
+	#TODO - consider testing flag?
 
 	return "accept" if $first_party;
 	return "reject" if ($self->signall_strict && !$self->testing);
@@ -146,36 +144,6 @@ sub apply
 
 	return "reject" if ($self->signall && !$self->testing);
 	return "neutral";
-}
-
-=head2 flags() - get or set the flags (t=) tag
-
-A colon-separated list of flags. Flag values are:
-
-=over
-
-=item y
-
-The entity is testing signing practices, and the Verifier
-SHOULD NOT consider a message suspicious based on the record.
-
-=item s
-
-The signing practices apply only to the named domain, and
-not to subdomains.
-
-=back
-
-=cut
-
-sub flags
-{
-	my $self = shift;
-
-	(@_) and 
-		$self->{tags}->{t} = shift;
-
-	$self->{tags}->{t};
 }
 
 =head2 is_implied_default_policy() - is this policy implied?
@@ -215,7 +183,7 @@ sub location
 
 sub name
 {
-	return "author";
+	return "ADSP";
 }
 
 =head2 policy() - get or set the outbound signing policy (dkim=) tag
@@ -232,14 +200,16 @@ The default. The entity may sign some or all email.
 
 =item C<all>
 
-All mail from the entity is signed.
-(The DKIM signature can use any domain, not necessarily matching
-the From: address.)
+All mail from the domain is expected to be signed, using a valid Author
+signature, but the author does not suggest discarding mail without a
+valid signature.
 
-=item C<strict>
+=item C<discardable>
 
-All mail from the entity is signed with Originator signatures.
-(The DKIM signature uses a domain matching the From: address.)
+All mail from the domain is expected to be signed, using a valid Author
+signature, and the author is so confident that non-signed mail claiming
+to be from this domain can be automatically discarded by the recipient's
+mail server.
 
 =back
 
@@ -256,10 +226,6 @@ sub policy
 	{
 		return $self->{tags}->{dkim};
 	}
-	elsif (defined $self->{tags}->{o})
-	{
-		return $self->{tags}->{o};
-	}
 	else
 	{
 		return "unknown";
@@ -275,11 +241,10 @@ sub signall
 	my $self = shift;
 
 	return $self->policy &&
-		($self->policy =~ /all/i
-		|| $self->policy eq "-"); # an older symbol for "all"
+		($self->policy =~ /all/i);
 }
 
-=head2 signall_strict() - true if policy is "strict"
+=head2 signall_discardable() - true if policy is "strict"
 
 =cut
 
@@ -288,39 +253,7 @@ sub signall_strict
 	my $self = shift;
 
 	return $self->policy &&
-		($self->policy =~ /strict/i
-		|| $self->policy eq "!");  # "!" is an older symbol for "strict"
-}
-
-sub signsome
-{
-	my $self = shift;
-
-	$self->policy or
-		return 1;
-
-	$self->policy eq "~" and
-		return 1;
-
-	return;
-}
-
-=head2 testing() - checks the testing flag
-
-  my $testing = $policy->testing;
-
-If nonzero, the testing flag is set on the signing policy, and the
-verify should not consider a message suspicious based on this policy.
-
-=cut
-
-sub testing
-{
-	my $self = shift;
-	my $t = $self->flags;
-	($t && $t =~ /y/i)
-		and return 1;
-	return;
+		($self->policy =~ /strict/i);
 }
 
 1;
@@ -343,7 +276,7 @@ Jason Long, E<lt>jlong@messiah.eduE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2006-2007 by Messiah College
+Copyright (C) 2006-2009 by Messiah College
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.6 or,

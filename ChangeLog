@@ -1,3 +1,51 @@
+2009-04-04: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm (fetch_author_domain_policies): new method
+   for fetching ADSP records for a particular message
+
+2009-04-03: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/DkPolicy.pm: moved the DomainKeys-specific policy
+   stuff from Policy.pm to here
+ * t/policy.t: change tests to use DkPolicy instead of Policy
+ * lib/Mail/DKIM/Verifier.pm (fetch_sender_policy): use DkPolicy
+   class instead of Policy class
+
+2009-04-03: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/AuthorDomainPolicy.pm: first draft of ADSP support
+
+2009-04-03: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm: rename fetch_policies() to policies()
+ * scripts/dkimverify.pl: replace use of fetch_policies() with
+   policies()
+
+2009-03-30: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm: document a "temperror" result, which
+   I will soon provide support for
+
+2009-03-30: Jason Long <jlong@messiah.edu>
+ * t/verifier.t: add support for testing DNS failures; add tests for
+   detail messages of public key errors
+ * t/verifier.t: add some tests of DNS failures
+
+2009-03-30: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Signature.pm (get_public_key): remember errors and
+   always report them the same way
+
+2009-03-30: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Policy.pm, DkPolicy.pm: new method "name" to give a
+   short name of the policy
+ * scripts/dkimverify.pl: use the new fetch_policies() api to list
+   the results of applicable policies
+
+2009-03-24: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm (fetch_policies): new method for fetching
+   all applicable policies, and is guaranteed not to "die".
+
+2009-03-24: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/DNS.pm: use a global variable to specify what Timeout
+   to use
+ * lib/Mail/DKIM/DNS.pm: detect DNS resolver errors and report them
+ * t/public_key.t: test various DNS failures
+
 2009-03-10: Jason Long <jlong@messiah.edu>
  * t/simple_canonicalization.t: fix simple-canonicalization test, which
    broke when I removed support for prestandardized DKIM signatures
@@ -54,6 +102,7 @@
    about an uninitialized value
  * lib/Mail/DKIM/Common.pm (message_originator, message_sender): if a
    From/Sender line is present, but blank, still return a valid object
+   (issue #2126559)
  * t/public_key.t: new test to check for DNS problems
 
  -- VERSION 0.32 --

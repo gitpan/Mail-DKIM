@@ -12,8 +12,16 @@ use warnings;
 
 package Mail::DKIM::DNS;
 use Net::DNS;
+our $TIMEOUT = 10;
 
-# query- now returns a list of RR objects
+# query- returns a list of RR objects
+#   or an empty list if the domain record does not exist
+#       (e.g. in the case of NXDOMAIN or NODATA)
+#   or throws an error on a DNS query time-out or other transient error
+#       (e.g. SERVFAIL)
+#
+# if an empty list is returned, $@ is also set to a string explaining
+# why no records were returned (e.g. "NXDOMAIN").
 #
 sub query
 {
@@ -31,7 +39,7 @@ sub query
 	{
 		# set a 10 second timeout
 		local $SIG{ALRM} = sub { die "DNS query timeout for $domain\n" };
-		alarm 10;
+		alarm $TIMEOUT;
 
 		# the query itself could cause an exception, which would prevent
 		# us from resetting the alarm before leaving the eval {} block
@@ -48,8 +56,15 @@ sub query
 	alarm 0; #FIXME- restore previous alarm?
 	die $E if $E;
 
-	return () if not $resp;
-	return grep { lc $_->type eq lc $type } $resp->answer;
+	if ($resp)
+	{
+		my @result = grep { lc $_->type eq lc $type } $resp->answer;
+		return @result if @result;
+	}
+
+	$@ = $rslv->errorstring;
+	return () if ($@ eq "NOERROR" || $@ eq "NXDOMAIN");
+	die "DNS error: $@\n";
 }
 
 1;
