@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use Test::Simple tests => 16;
+use Test::Simple tests => 17;
 
 use Mail::DKIM::Signer;
 
@@ -127,6 +127,32 @@ this message has no header
 END_OF_SAMPLE
 $sample_email =~ s/\n/\015\012/gs;
 
+	$dkim->PRINT($sample_email);
+	$dkim->CLOSE;
+
+	ok($dkim->signature, "signature() works");
+}
+
+{ # TEST signing a message with LOTS OF blank lines
+
+	my $dkim = Mail::DKIM::Signer->new(
+			Algorithm => "rsa-sha1",
+			Method => "relaxed",
+			Domain => "example.org",
+			Selector => "test",
+			KeyFile => $keyfile);
+
+	my $sample_email = <<END_OF_SAMPLE;
+From: jason <jason\@example.org>
+Subject: hi there
+Comment: what is a comment
+
+this is a sample message
+END_OF_SAMPLE
+	$sample_email .= ("\n" x 50000);
+	$sample_email =~ s/\n/\015\012/gs;
+
+	# older, broken, versions of Mail::DKIM will hang here
 	$dkim->PRINT($sample_email);
 	$dkim->CLOSE;
 

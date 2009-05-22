@@ -43,6 +43,19 @@ Mail::DKIM::Verifier - verifies a DKIM-signed message
   # what is the result of the verify?
   my $result = $dkim->result;
 
+  # there might be multiple signatures, what is the result per signature?
+  foreach my $signature ($dkim->signatures)
+  {
+      print "signature identity: " . $signature->identity . "\n";
+      print "verify result: " . $signature->result_detail . "\n";
+  }
+
+  # the alleged author of the email may specify how to handle email
+  foreach my $policy ($dkim->policies)
+  {
+      die "fraudulent message" if ($policy->apply($dkim) eq "reject");
+  }
+
 =cut
 
 =head1 DESCRIPTION
@@ -54,7 +67,7 @@ message has been completely read, the signatures are verified and the
 results of the verification can be accessed.
 
 To use the verifier, first create the verifier object. Then start
-"feeding" it the email message to be verified. When all the headers
+"feeding" it the email message to be verified. When all the _headers_
 have been read, the verifier:
 
  1. checks whether any DomainKeys/DKIM signatures were found
@@ -62,8 +75,15 @@ have been read, the verifier:
  3. sets up the appropriate algorithms and canonicalization objects
  4. canonicalizes the headers and computes the header hash
 
-Then, when the body of the message has been completely fed into the
+Then, when the _body_ of the message has been completely fed into the
 verifier, the body hash is computed and the signatures are verified.
+
+The results of the verification can be checked with L</"result()">
+or L</"signatures()">.
+
+Messages that do not verify may be checked against the alleged sender's
+published signing policy with L</"policies()"> and
+L<Mail::DKIM::Policy/"apply()">.
 
 =head1 CONSTRUCTOR
 
@@ -89,7 +109,7 @@ is written to the referenced string or file handle.
 package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = 0.34;
+our $VERSION = 0.35;
 
 sub init
 {
@@ -495,36 +515,6 @@ to be read into memory at once.
 This method finishes the canonicalization process, computes a hash,
 and verifies the signature.
 
-=head2 fetch_author_policy() - retrieves a signing policy from DNS
-
-  my $policy = $dkim->fetch_author_policy;
-  my $policy_result = $policy->apply($dkim);
-
-This method retrieves the DKIM Sender Signing Practices
-record as described in Internet Draft draft-ietf-dkim-ssp-00-01dc.
-This Internet Draft is now obsolete; this method is only kept for
-backward-compatibility purposes.
-
-Please use the L</"policies()"> method instead.
-
-=cut
-
-sub fetch_author_policy
-{
-	my $self = shift;
-	my ($author) = @_;
-	use Mail::DKIM::DkimPolicy;
-
-	# determine address found in the "From"
-	$author ||= $self->message_originator->address;
-
-	# fetch the policy
-	return Mail::DKIM::DkimPolicy->fetch(
-			Protocol => "dns",
-			Author => $author,
-			);
-}
-
 =head2 fetch_author_domain_policies() - retrieves ADSP records from DNS
 
   my @policies = $dkim->fetch_author_domain_policies;
@@ -565,6 +555,36 @@ sub fetch_author_domain_policies
 			Author => $_,
 			)
 		} @authors;
+}
+
+=head2 fetch_author_policy() - retrieves a signing policy from DNS
+
+  my $policy = $dkim->fetch_author_policy;
+  my $policy_result = $policy->apply($dkim);
+
+This method retrieves the DKIM Sender Signing Practices
+record as described in Internet Draft draft-ietf-dkim-ssp-00-01dc.
+This Internet Draft is now obsolete; this method is only kept for
+backward-compatibility purposes.
+
+Please use the L</"policies()"> method instead.
+
+=cut
+
+sub fetch_author_policy
+{
+	my $self = shift;
+	my ($author) = @_;
+	use Mail::DKIM::DkimPolicy;
+
+	# determine address found in the "From"
+	$author ||= $self->message_originator->address;
+
+	# fetch the policy
+	return Mail::DKIM::DkimPolicy->fetch(
+			Protocol => "dns",
+			Author => $author,
+			);
 }
 
 =head2 fetch_sender_policy() - retrieves a signing policy from DNS
