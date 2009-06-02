@@ -1,3 +1,9 @@
+2009-06-02: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Policy.pm (as_string): restore this method which was
+   accidentally removed in 0.34.
+
+ -- VERSION 0.35 --
+
 2009-05-22: Jason Long <jlong@messiah.edu>
  * t/signer.t: add a test-case of a message with 10000's of blank
    lines; this seems to DoS the canonicalization routines
