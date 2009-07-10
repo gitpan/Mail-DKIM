@@ -1,3 +1,51 @@
+2009-07-10: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Policy.pm: revert ability for subclasses to
+   override behavior of no-results DNS query
+ * lib/Mail/DKIM/AuthorDomainPolicy.pm: if ADSP record is not found,
+   check whether the domain itself exists
+ * t/policy.t: add a test for the ADSP record causing a DNS error
+   but the domain itself still existing
+
+2009-07-10: Jason Long <jlong@messiah.edu>
+ * t/public_key.t: refine the testing for DNS timeouts and SERVFAIL
+   errors
+ * t/policy.t: add some tests for DNS failures during policy queries
+ * lib/Mail/DKIM/AuthorDomainPolicy.pm: more explicit documentation
+   describing how DNS errors (and NXDOMAIN results) are handled
+
+2009-07-09: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Policy.pm: allow subclasses to override behavior
+   when DNS query returns no records
+ * lib/Mail/DKIM/AuthorDomainPolicy.pm: when DNS query returns no
+   records, check the domain itself and possibly die.
+
+2009-07-09: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm: wasn't using the right API to get
+   the ADSP policy
+
+2009-07-09: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/AuthorDomainPolicy.pm, DkimPolicy.pm: changed the
+   format of how methods are documented
+
+2009-07-07: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/AuthorDomainPolicy.pm, DkimPolicy.pm: add a
+   description of the class to the documentation
+
+2009-06-09: Jason Long <jlong@messiah.edu>
+ * scripts/dkimsign.pl: fix typo in the debugging output
+
+2009-06-09: Jason Long <jlong@messiah.edu>
+ * t/signer.t: test case for bug 2803465: space between header field
+   name and colon cause signature to skip that header
+ * lib/Mail/DKIM/Common.pm (add_header): fix regexp so that a space
+   between the header field name and the colon is not treated as part
+   of the header field name (issue #2803465)
+
+2009-06-02: Jason Long <jlong@messiah.edu>
+ * t/policy.t: test for the as_string() method
+
+ -- VERSION 0.36 --
+
 2009-06-02: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Policy.pm (as_string): restore this method which was
    accidentally removed in 0.34.

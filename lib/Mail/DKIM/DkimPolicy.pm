@@ -20,9 +20,28 @@ use Mail::DKIM::DNS;
 
 Mail::DKIM::DkimPolicy - represents a DKIM Sender Signing Practices record
 
+=head1 DESCRIPTION
+
+The Sender Signing Practices (SSP) record can be published by any
+domain to help a receiver know what to do when it encounters an unsigned
+message claiming to originate from that domain.
+
+The record is published as a DNS TXT record at _policy._domainkey.DOMAIN
+where DOMAIN is the domain of the message's "From" address.
+
+This record format has been superceded by ADSP. See
+L<Mail::DKIM::AuthorDomainPolicy> for information about ADSP.
+It is implemented here because at one time it appeared this is what
+would be standardized by the IETF. It will be removed from Mail::DKIM
+at some point in the future.
+The last version of the SSP specification can be found at
+L<http://tools.ietf.org/html/draft-ietf-dkim-ssp-02>.
+
 =head1 CONSTRUCTORS
 
-=head2 fetch() - lookup a DKIM signing practices record
+=head2 fetch()
+
+Lookup a DKIM signing practices record.
 
   my $policy = Mail::DKIM::DkimPolicy->fetch(
             Protocol => "dns",
@@ -54,7 +73,9 @@ sub get_lookup_name
 	return "_policy._domainkey." . $prms->{Domain};
 }
 
-=head2 new() - construct a default policy object
+=head2 new()
+
+Construct a default policy object.
 
   my $policy = Mail::DKIM::DkimPolicy->new;
 
@@ -77,7 +98,9 @@ sub default
 
 =head1 METHODS
 
-=head2 apply() - apply the policy to the results of a DKIM verifier
+=head2 apply()
+
+Apply the policy to the results of a DKIM verifier.
 
   my $result = $policy->apply($dkim_verifier);
 
@@ -148,7 +171,9 @@ sub apply
 	return "neutral";
 }
 
-=head2 flags() - get or set the flags (t=) tag
+=head2 flags()
+
+Get or set the flags (t=) tag.
 
 A colon-separated list of flags. Flag values are:
 
@@ -178,7 +203,9 @@ sub flags
 	$self->{tags}->{t};
 }
 
-=head2 is_implied_default_policy() - is this policy implied?
+=head2 is_implied_default_policy()
+
+Is this policy implied?
 
   my $is_implied = $policy->is_implied_default_policy;
 
@@ -195,7 +222,9 @@ sub is_implied_default_policy
 	return ($self == $default_policy);
 }
 
-=head2 location() - where the policy was fetched from
+=head2 location()
+
+Where the policy was fetched from.
 
 If the policy is domain-wide, this will be domain where the policy was
 published.
@@ -218,7 +247,9 @@ sub name
 	return "author";
 }
 
-=head2 policy() - get or set the outbound signing policy (dkim=) tag
+=head2 policy()
+
+Get or set the outbound signing policy (dkim=) tag.
 
   my $sp = $policy->policy;
 
@@ -266,7 +297,9 @@ sub policy
 	}
 }
 
-=head2 signall() - true if policy is "all"
+=head2 signall()
+
+True if policy is "all".
 
 =cut
 
@@ -279,7 +312,9 @@ sub signall
 		|| $self->policy eq "-"); # an older symbol for "all"
 }
 
-=head2 signall_strict() - true if policy is "strict"
+=head2 signall_strict()
+
+True if policy is "strict".
 
 =cut
 
@@ -305,7 +340,9 @@ sub signsome
 	return;
 }
 
-=head2 testing() - checks the testing flag
+=head2 testing()
+
+Checks the testing flag.
 
   my $testing = $policy->testing;
 

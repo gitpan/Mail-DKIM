@@ -2,10 +2,11 @@
 
 use strict;
 use warnings;
-use Test::Simple tests => 12;
+use Test::More tests => 19;
 
 use Mail::DKIM::DkPolicy;
 use Mail::DKIM::DkimPolicy;
+use Mail::DKIM::AuthorDomainPolicy;
 
 my $policy;
 $policy = Mail::DKIM::DkPolicy->new();
@@ -35,12 +36,61 @@ ok(!$policy->testing, "testing flag has default value");
 #$policy->testing(1);
 #ok($policy->testing, "testing flag has been changed");
 
+ok($policy->as_string, "as_string() method is implemented");
+
 $policy = Mail::DKIM::DkPolicy->fetch(
 		Protocol => "dns",
 		Sender => 'alfred@nobody.messiah.edu',
 		);
 ok($policy, "fetch() returns policy for nonexistent domain");
 ok($policy->is_implied_default_policy, "yep, it's the default policy");
+
+$policy = Mail::DKIM::AuthorDomainPolicy->fetch(
+		Protocol => "dns",
+		Domain => "nonexistent-subdomain.messiah.edu",
+		);
+ok($policy, "fetch() returns policy for nonexistent domain");
+ok(!$policy->is_implied_default_policy, "shouldn't be the default policy");
+ok($policy->policy eq "NXDOMAIN", "got policy of NXDOMAIN");
+
+SKIP:
+{
+	skip "these tests fail when run on the other side of my firewall", 3
+		unless ($ENV{DNS_TESTS} && $ENV{DNS_TESTS} > 1);
+
+	$policy = eval { Mail::DKIM::AuthorDomainPolicy->fetch(
+			Protocol => "dns",
+			Domain => "blackhole.messiah.edu",
+			) };
+	my $E = $@;
+	print "# got error: $E" if $E;
+	ok(!$policy
+		&& $E && $E =~ /(timeout|timed? out)/,
+		"timeout error fetching policy");
+
+	$policy = eval { Mail::DKIM::AuthorDomainPolicy->fetch(
+			Protocol => "dns",
+			Domain => "blackhole2.messiah.edu",
+			) };
+	$E = $@;
+	print "# got error: $E" if $E;
+	ok(!$policy
+		&& $E && $E =~ /SERVFAIL/,
+		"SERVFAIL dns error fetching policy");
+
+	# test a policy record where _domainkey.DOMAIN gives a
+	# DNS error, but DOMAIN itself is valid
+	
+	$policy = eval { Mail::DKIM::AuthorDomainPolicy->fetch(
+			Protocol => "dns",
+			Domain => "blackhole3.messiah.edu",
+			) };
+	$E = $@;
+	print "# got error: $E" if $E;
+	ok(!$policy
+		&& $E && $E =~ /SERVFAIL/,
+		"SERVFAIL dns error fetching policy");
+}
 
 #debug_policies(qw(yahoo.com hotmail.com gmail.com));
 #debug_policies(qw(paypal.com ebay.com));

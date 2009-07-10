@@ -111,7 +111,7 @@ is written to the referenced string or file handle.
 package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = 0.36;
+our $VERSION = 0.37;
 
 sub init
 {
@@ -558,7 +558,7 @@ sub fetch_author_domain_policies
 
 	# fetch the policies
 	return map {
-		Mail::DKIM::DkimPolicy->fetch(
+		Mail::DKIM::AuthorDomainPolicy->fetch(
 			Protocol => "dns",
 			Author => $_,
 			)

@@ -20,17 +20,78 @@ use Mail::DKIM::DNS;
 
 Mail::DKIM::AuthorDomainPolicy - represents an Author Domain Signing Practices (ADSP) record
 
+=head1 DESCRIPTION
+
+The Author Domain Signing Policies (ADSP) record can be published by any
+domain to help a receiver know what to do when it encounters an unsigned
+message claiming to originate from that domain.
+
+The record is published as a DNS TXT record at _adsp._domainkey.DOMAIN
+where DOMAIN is the domain of the message's "From" address.
+
+More details about this record can be found by reading the specification
+itself at L<http://tools.ietf.org/html/draft-ietf-dkim-ssp-10>.
+
 =head1 CONSTRUCTORS
 
-=head2 fetch() - lookup an ADSP record in DNS
+=head2 fetch()
+
+Lookup an ADSP record in DNS.
 
   my $policy = Mail::DKIM::AuthorDomainPolicy->fetch(
             Protocol => "dns",
             Author => 'jsmith@example.org',
           );
 
+If the ADSP record is found and appears to be valid, an object
+containing that record's information will be constructed and returned.
+If the ADSP record is blank or simply does not exist, an object
+representing the default policy will be returned instead.
+(See also L</"is_implied_default_policy()">.)
+If a DNS error occurs (e.g. SERVFAIL or time-out), this method
+will "die".
+
 =cut
 
+sub fetch
+{
+	my $class = shift;
+	my %prms = @_;
+
+	my $self = eval { $class->SUPER::fetch(%prms) };
+	my $E = $@;
+
+	if ($self && !$self->is_implied_default_policy)
+	{
+		return $self;
+	}
+
+	# didn't find a policy; check the domain itself
+	{
+		#FIXME- not good to have this code duplicated between
+		#here and get_lookup_name()
+		#
+		if ($prms{Author} && !$prms{Domain})
+		{
+			$prms{Domain} = ($prms{Author} =~ /\@([^@]*)$/ and $1);
+		}
+
+		unless ($prms{Domain})
+		{
+			die "no domain to fetch policy for\n";
+		}
+
+		my @resp = Mail::DKIM::DNS::query($prms{Domain}, "MX");
+		if (!@resp && $@ eq "NXDOMAIN")
+		{
+			return $class->nxdomain_policy;
+		}
+	}
+
+	die $E if $E;
+	return $self;
+}
+	
 # get_lookup_name() - determine name of record to fetch
 #
 sub get_lookup_name
@@ -54,7 +115,9 @@ sub get_lookup_name
 	return "_adsp._domainkey." . $prms->{Domain};
 }
 
-=head2 new() - construct a default policy object
+=head2 new()
+
+Construct a default policy object.
 
   my $policy = Mail::DKIM::AuthorDomainPolicy->new;
 
@@ -75,9 +138,24 @@ sub default
 	return $DEFAULT_POLICY;
 }
 
+#undocumented private class method
+our $NXDOMAIN_POLICY;
+sub nxdomain_policy
+{
+	my $class = shift;
+	if (!$NXDOMAIN_POLICY)
+	{
+		$NXDOMAIN_POLICY = $class->new;
+		$NXDOMAIN_POLICY->policy("NXDOMAIN");
+	}
+	return $NXDOMAIN_POLICY;
+}
+	
 =head1 METHODS
 
-=head2 apply() - apply the policy to the results of a DKIM verifier
+=head2 apply()
+
+Apply the policy to the results of a DKIM verifier.
 
   my $result = $policy->apply($dkim_verifier);
 
@@ -146,7 +224,9 @@ sub apply
 	return "neutral";
 }
 
-=head2 is_implied_default_policy() - is this policy implied?
+=head2 is_implied_default_policy()
+
+Tells whether this policy implied.
 
   my $is_implied = $policy->is_implied_default_policy;
 
@@ -163,7 +243,9 @@ sub is_implied_default_policy
 	return ($self == $default_policy);
 }
 
-=head2 location() - where the policy was fetched from
+=head2 location()
+
+Tells where the policy was fetched from.
 
 If the policy is domain-wide, this will be domain where the policy was
 published.
@@ -186,7 +268,9 @@ sub name
 	return "ADSP";
 }
 
-=head2 policy() - get or set the outbound signing policy (dkim=) tag
+=head2 policy()
+
+Get or set the outbound signing policy (dkim=) tag.
 
   my $sp = $policy->policy;
 
@@ -211,6 +295,11 @@ signature, and the author is so confident that non-signed mail claiming
 to be from this domain can be automatically discarded by the recipient's
 mail server.
 
+=item C<"NXDOMAIN">
+
+The domain is out of scope, i.e., the domain does not exist in the
+DNS.
+
 =back
 
 =cut
@@ -232,7 +321,9 @@ sub policy
 	}
 }
 
-=head2 signall() - true if policy is "all"
+=head2 signall()
+
+True if policy is "all".
 
 =cut
 
@@ -244,7 +335,9 @@ sub signall
 		($self->policy =~ /all/i);
 }
 
-=head2 signall_discardable() - true if policy is "strict"
+=head2 signall_discardable()
+
+True if policy is "strict".
 
 =cut
 
@@ -264,9 +357,11 @@ sub signall_strict
 
 =item *
 
-If a sender signing policy is not found for a given domain, the
-fetch() method should search the parent domains, according to
-section 4 of the dkim-ssp Internet Draft.
+Section 4.3 of the specification says to perform a query on the
+domain itself just to see if it exists. This class is not
+currently doing that, i.e. it might report NXDOMAIN because
+_adsp._domainkey.example.org is nonexistent, but it should
+not be treated the same as example.org being nonexistent.
 
 =back
 
