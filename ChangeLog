@@ -1,3 +1,14 @@
+2009-09-02: Jason Long <jlong@messiah.edu>
+ * t/adsp.t: a test script for checking AuthorDomainPolicy.pm
+ * lib/Mail/DKIM/AuthorDomainPolicy.pm: use d= tag not i= tag when
+   checking for first-party signatures; fix for testing() method
+   not found error; fix for "all" and "discardable" not doing the
+   right thing
+   
+2009-08-14: Jason Long <jlong@messiah.edu>
+ * sample_mime_lite.pl: a sample script showing how to use Mail::DKIM
+   with MIME::Lite
+
 2009-07-10: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Policy.pm: revert ability for subclasses to
    override behavior of no-results DNS query
