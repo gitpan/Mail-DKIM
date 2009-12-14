@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                Mail-DKIM
-version:             0.37
+version:             0.37_5
 abstract:            Signs/verifies Internet mail with DKIM/DomainKey signatures
 license:             ~
 author:              

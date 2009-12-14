@@ -111,7 +111,7 @@ is written to the referenced string or file handle.
 package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = 0.37;
+our $VERSION = 0.38;
 
 sub init
 {
@@ -511,6 +511,12 @@ Feeds part of the message to the verifier.
 Feeds content of the message being verified into the verifier.
 The API is designed this way so that the entire message does NOT need
 to be read into memory at once.
+
+Please note that although the PRINT() method expects you to use
+SMTP-style line termination characters, you should NOT use the
+SMTP-style dot-stuffing technique described in RFC 2821 section 4.5.2.
+Nor should you use a <CR><LF>.<CR><LF> sequence to terminate the
+message.
 
 =head2 CLOSE()
 
