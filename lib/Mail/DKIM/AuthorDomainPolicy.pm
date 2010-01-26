@@ -129,6 +129,17 @@ sub new
 	return $class->parse(String => "");
 }
 
+=head2 parse()
+
+Construct an ADSP record from a string.
+
+  my $policy = Mail::DKIM::AuthorDomainPolicy->parse(
+          String => "dkim=all",
+          Domain => "aaa.example",
+      );
+
+=cut
+
 #undocumented private class method
 our $DEFAULT_POLICY;
 sub default
@@ -181,6 +192,15 @@ The message is neither approved nor rejected by the sender signing
 policy. It can be considered somewhat suspicious.
 
 =back
+
+Note: in the future, these values may become:
+ none - no ADSP record is published
+ pass - a passing signature is present
+ fail - ADSP record is "all" and no passing signature is found
+ discard - ADSP record is "discardable" and no passing signature is found
+ nxdomain - the DNS domain does not exist
+ temperror - transient error occurred
+ permerror - non-transient error occurred
 
 =cut
 
