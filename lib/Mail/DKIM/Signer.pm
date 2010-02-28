@@ -10,9 +10,8 @@
 use strict;
 use warnings;
 
-use Mail::DKIM::Algorithm::rsa_sha1;
+use Mail::DKIM::PrivateKey;
 use Mail::DKIM::Signature;
-use Mail::Address;
 
 =head1 NAME
 
@@ -21,6 +20,7 @@ Mail::DKIM::Signer - generates a DKIM signature for a message
 =head1 SYNOPSIS
 
   use Mail::DKIM::Signer;
+  use Mail::DKIM::TextWrap;  #recommended
 
   # create a signer object
   my $dkim = Mail::DKIM::Signer->new(
@@ -48,6 +48,27 @@ Mail::DKIM::Signer - generates a DKIM signature for a message
 
   # what is the signature result?
   my $signature = $dkim->signature;
+  print $signature->as_string;
+
+=head1 DESCRIPTION
+
+This class is the part of L<Mail::DKIM> responsible for generating
+signatures for a given message. You create an object of this class,
+specifying the parameters of the signature you wish to create, or
+specifying a callback function so that the signature parameters can
+be determined later. Next, you feed it the entire message using
+L<"/PRINT()">, completing with L<"/CLOSE()">. Finally, use the
+L<"/signatures()"> method to access the generated signatures.
+
+=head2 Pretty Signatures
+
+L<Mail::DKIM> includes a signature-wrapping module (which inserts
+linebreaks into the generated signature so that it looks nicer in the
+resulting message. To enable this module, simply call
+
+  use Mail::DKIM::TextWrap;
+
+in your program before generating the signature.
 
 =head1 CONSTRUCTOR
 
@@ -456,6 +477,11 @@ Get or set the private key object.
 
   $dkim->key(Mail::DKIM::PrivateKey->load(File => "private.key"));
 
+The key object can be any object that implements the
+L<sign_digest() method|Mail::DKIM::PrivateKey/"sign_digest()">.
+(Providing your own object can be useful if your actual keys
+are stored out-of-process.)
+
 If you use this method to specify a private key,
 do not use L</"key_file()">.
 
@@ -585,10 +611,10 @@ Access the generated signature object.
   my $signature = $dkim->signature;
 
 Returns the generated signature. The signature is an object of type
-Mail::DKIM::Signature. If multiple signatures were generated, this method
+L<Mail::DKIM::Signature>. If multiple signatures were generated, this method
 returns the last one.
 
-The signature should be B<prepended> to the message to make the
+The signature (as text) should be B<prepended> to the message to make the
 resulting message. At the very least, it should precede any headers
 that were signed.
 
