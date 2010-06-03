@@ -1,3 +1,17 @@
+2010-06-03: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm: prevent abuse- if a message has more than
+   50 signatures headers, we start ignoring them (it's unreasonable for
+   a message to have more than a very few signature headers).
+
+2010-04-08: Jason Long <jlong@messiah.edu>
+ * t/verifier.t: wrote some tests for DomainKey signatures with empty,
+   missing, or invalid q= tag values
+ * lib/Mail/DKIM/Verifier.pm: move use of check_signature_identity() out
+   of finish_header() and into check_and_verify_signature(); this fixes
+   an issue with getting wrong error codes when q= tag is broken.
+
+ -- VERSION 0.38 --
+
 2010-03-31: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/DkSignature.pm, Signature.pm: avoid calling lc() on
    an undefined value (this generates warnings in Perl 5.12.x).

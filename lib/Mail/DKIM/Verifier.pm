@@ -111,7 +111,8 @@ is written to the referenced string or file handle.
 package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = 0.38;
+our $VERSION = 0.39;
+our $MAX_SIGNATURES_TO_PROCESS = 50;
 
 sub init
 {
@@ -197,6 +198,10 @@ sub add_signature
 	my $self = shift;
 	croak "wrong number of arguments" unless (@_ == 1);
 	my ($signature) = @_;
+
+	# ignore signature headers once we've seen 50 or so
+	# this protects against abuse.
+	return if (@{$self->{signatures}} > $MAX_SIGNATURES_TO_PROCESS);
 
 	push @{$self->{signatures}}, $signature;
 
@@ -396,21 +401,6 @@ sub finish_header
 		$algorithm->finish_header;
 	}
 
-	# For each parsed signature, check it for validity. If none are valid,
-	# our result is "invalid" and our result detail will be the reason
-	# why the last signature was invalid.
-
-	foreach my $signature (@{$self->{signatures}})
-	{
-		unless (check_signature_identity($signature))
-		{
-			$self->{signature_reject_reason} = "bad identity";
-			$signature->result("invalid",
-				$self->{signature_reject_reason});
-			next;
-		}
-	}
-
 	# stop processing signatures that are already known to be invalid
 	@{$self->{algorithms}} = grep
 		{
@@ -434,6 +424,12 @@ sub _check_and_verify_signature
 
 		# check signature
 		my $signature = $algorithm->signature;
+		unless (check_signature_identity($signature))
+		{
+			$self->{signature_reject_reason} = "bad identity";
+			return ("invalid", $self->{signature_reject_reason});
+		}
+
 		# get public key
 		my $pkey;
 		eval
