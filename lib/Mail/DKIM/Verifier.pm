@@ -112,7 +112,7 @@ package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
 our $VERSION = 0.39;
-our $MAX_SIGNATURES_TO_PROCESS = 50;
+our $MAX_SIGNATURES_TO_PROCESS = 500000;
 
 sub init
 {
@@ -398,7 +398,7 @@ sub finish_header
 
 	foreach my $algorithm (@{$self->{algorithms}})
 	{
-		$algorithm->finish_header;
+		$algorithm->finish_header(Headers => $self->{headers});
 	}
 
 	# stop processing signatures that are already known to be invalid

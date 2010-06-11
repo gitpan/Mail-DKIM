@@ -1,3 +1,20 @@
+2010-06-11: Jason Long <jlong@messiah.edu>
+ * t/signer_dk.t: create regression tests for DomainKeys signature
+   generation
+
+2010-06-11: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Verifier.pm, Signer.pm, Algorithm/Base.pm
+   (finish_header): provide reference to entire list of headers at
+   completion of header, so that canonicalizers do not need to store
+   their own copy of the header
+ * lib/Mail/DKIM/Canonicalization/DkimCommon.pm: do not store header as
+   parsed, rather only canonicalize header within finish_header()
+ * lib/Mail/DKIM/Canonicalization/DkCommon.pm: do not store header as
+   parsed, rather only canonicalize header within finish_header()
+ * lib/Mail/DKIM/Canonicalization/Base.pm (finish_header): change API
+ * t/simple_canonicalization.t: update for the API change of
+   Canonicalization/Base.pm
+
 2010-06-03: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Verifier.pm: prevent abuse- if a message has more than
    50 signatures headers, we start ignoring them (it's unreasonable for

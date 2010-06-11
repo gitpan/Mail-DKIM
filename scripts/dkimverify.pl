@@ -27,11 +27,27 @@ if (defined $debug_canonicalization)
 my $dkim = new Mail::DKIM::Verifier(
 		Debug_Canonicalization => $debugfh,
 	);
+	my $got_header;
+	my $line_no = 0;
 while (<STDIN>)
 {
 	chomp;
 	s/\015$//;
+	if (!$got_header and /^$/)
+	{
+		$got_header = 1;
+		print STDERR "reached end of header\n";
+	}
 	$dkim->PRINT("$_\015\012");
+	my @lines = `ps -o rss,vsz $$`;
+	printf STDERR "%5d: %s", ++$line_no, $lines[1];
+#
+#	use Data::Dumper;
+#	if ($line_no == 20)
+#	{
+#		print Dumper($dkim);
+#		exit;
+#	}
 }
 $dkim->CLOSE;
 
