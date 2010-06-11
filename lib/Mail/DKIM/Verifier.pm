@@ -112,7 +112,7 @@ package Mail::DKIM::Verifier;
 use base "Mail::DKIM::Common";
 use Carp;
 our $VERSION = 0.39;
-our $MAX_SIGNATURES_TO_PROCESS = 500000;
+our $MAX_SIGNATURES_TO_PROCESS = 50;
 
 sub init
 {
