@@ -1,10 +1,10 @@
 --- #YAML:1.0
 name:                Mail-DKIM
-version:             0.38_7
+version:             0.39
 abstract:            Signs/verifies Internet mail with DKIM/DomainKey signatures
 license:             ~
 author:              
-    - Jason Long <jlong@messiah.edu>
+    - Jason Long <jason@long.name>
 generated_by:        ExtUtils::MakeMaker version 6.42
 distribution_type:   module
 requires:     
