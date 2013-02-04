@@ -120,7 +120,7 @@ L<Mail::DKIM::PrivateKey> object.
 package Mail::DKIM::Signer;
 use base "Mail::DKIM::Common";
 use Carp;
-our $VERSION = 0.39;
+our $VERSION = 0.40;
 
 # PROPERTIES
 #
@@ -354,7 +354,8 @@ sub add_signature
 
 	# create a canonicalization filter and algorithm
 	my $algorithm_class = $signature->get_algorithm_class(
-			$signature->algorithm);
+			$signature->algorithm)
+		or die "unsupported algorithm " . ($signature->algorithm || "") . "\n";
 	my $algorithm = $algorithm_class->new(
 			Signature => $signature,
 			Debug_Canonicalization => $self->{Debug_Canonicalization},

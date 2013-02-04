@@ -1,6 +1,26 @@
 This file summarizes what's changed between releases of Mail-DKIM.
 See the ChangeLog file for the details.
 
+Version 0.40 - released 2013-02-04
+
+  * New/changed functionality:
+    * enable EDNS0 (extension mechanism for DNS) when performing
+      DNS queries; this allows larger DNS query results to be more
+      efficiently handled.
+
+  * bugfixes:
+    * fix the error message given when an invalid algorithm is
+      specified in the construction of Mail::DKIM::Signer.
+    * avoid a Perl warning about use of an undefined value
+    * speed- improved performance of parsing the message into lines
+      (rt.cpan.org issue #77902). Patch by Mark Martinec.
+
+  * API changes:
+    * global variable $Mail::DKIM::DNS::RESOLVER can be set if the
+      user wants to specify options to Net::DNS::Resolver (see also
+      rt.cpan.org issue #80425).
+
+
 Version 0.39 - released 2010-11-14
 
   * bugfixes:

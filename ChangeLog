@@ -1,3 +1,34 @@
+2013-02-04: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/DNS.pm: construct a default RESOLVER that sets
+   udppacketsize to 1280. This enables EDNS0 (extension mechanism for DNS),
+   allowing Mail::DKIM to handle larger keys.
+
+2012-11-28: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/DNS.pm: replace use of query() with send(), since it
+   is never appropriate to append the default domain, and using send()
+   paves the way to using bgsend() in the future for async dns.
+   Contributed by Mark Martinec.
+ * lib/Mail/DKIM/DNS.pm: add global variable $RESOLVER which the
+   user can override if they want to specify options to Net::DNS.
+
+2012-11-28: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/MessageParser.pm: rewrite of line parsing logic to
+   avoid unnecessary copying of the internal buffer. This replaces use
+   of $self->{buf} with ${$self->{buf_ref}} in many places. Patch
+   contributed by Mark Martinec.
+
+2012-11-28: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/Signer.pm: throw proper error message if an invalid
+   algorithm is requested
+ * lib/Mail/DKIM/PublicKey.pm: further refinement to fix Perl warning
+   about use of uninitialized value
+
+2011-04-21: Jason Long <jlong@messiah.edu>
+ * lib/Mail/DKIM/PublicKey.pm: fix a Perl warning about use of an
+   uninitialized value (reported by hsk@fli-leibniz.de)
+
+ -- VERSION 0.39 --
+
 2010-11-14: Jason Long <jlong@messiah.edu>
  * lib/Mail/DKIM/Signer.pm: fix an unusual error message given when
    no Key argument has been specified and it is time to load the

@@ -1,10 +1,50 @@
 #!/usr/bin/perl
 
-# Copyright 2007 Messiah College. All rights reserved.
+# Copyright 2007, 2012 Messiah College. All rights reserved.
 # Jason Long <jlong@messiah.edu>
 
 use strict;
 use warnings;
+
+=head1 NAME
+
+Mail::DKIM::DNS - performs DNS queries for Mail::DKIM
+
+=head1 DESCRIPTION
+
+This is the module that performs DNS queries for L<Mail::DKIM>.
+It contains a few global variables that can be set by the caller
+in order to change its behavior.
+
+=head1 CONFIGURATION
+
+There are a few global variables that can be set to modify the
+behavior of this module.
+
+=over
+
+=item $Mail::DKIM::DNS::TIMEOUT
+
+This specifies the maximum amount of time (in seconds) to wait for
+a single DNS query to complete. The default is 10.
+
+=item $Mail::DKIM::DNS::RESOLVER
+
+This specifies the instance of L<Net::DNS::Resolver> that is used
+to perform the queries. The default is undef, which causes a brand
+new default instance of L<Net::DNS::Resolver> to be created for each
+DNS query.
+
+Use this if you want to provide additional options to Net::DNS::Resolver,
+such as support for an extended query:
+
+  use Mail::DKIM::DNS;
+  $Mail::DKIM::DNS::RESOLVER = Net::DNS::Resolver->new;
+  $Mail::DKIM::DNS::RESOLVER->udppacketsize(4096);
+
+=back
+
+=cut
 
 # This class contains a method to perform synchronous DNS queries.
 # Hopefully some day it will have a method to perform
@@ -13,6 +53,8 @@ use warnings;
 package Mail::DKIM::DNS;
 use Net::DNS;
 our $TIMEOUT = 10;
+our $RESOLVER = Net::DNS::Resolver->new();
+$RESOLVER->udppacketsize(1280); # enables EDNS0, sets acceptable UDP packet size
 
 # query- returns a list of RR objects
 #   or an empty list if the domain record does not exist
@@ -27,8 +69,11 @@ sub query
 {
 	my ($domain, $type) = @_;
 
-	my $rslv = Net::DNS::Resolver->new()
-		or die "can't create DNS resolver";
+	my $rslv = $RESOLVER || Net::DNS::Resolver->new();
+	if (not $rslv)
+	{
+		die "can't create DNS resolver";
+	}
 
 	#
 	# perform the DNS query
@@ -48,7 +93,7 @@ sub query
 		# so we wrap the query in a nested eval {} block
 		eval
 		{
-			$resp = $rslv->query($domain, $type);
+			$resp = $rslv->send($domain, $type);
 		};
 		my $E = $@;
 		alarm 0;
@@ -111,3 +156,17 @@ sub query_async
 }
 
 1;
+
+=head1 AUTHOR
+
+Jason Long, E<lt>jlong@messiah.eduE<gt>
+
+=head1 COPYRIGHT AND LICENSE
+
+Copyright (C) 2006-2007, 2012 by Messiah College
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself, either Perl version 5.8.6 or,
+at your option, any later version of Perl 5 you may have available.
+
+=cut
