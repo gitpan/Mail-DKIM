@@ -13,43 +13,52 @@ Mail::DKIM::DNS - performs DNS queries for Mail::DKIM
 =head1 DESCRIPTION
 
 This is the module that performs DNS queries for L<Mail::DKIM>.
-It contains a few global variables that can be set by the caller
-in order to change its behavior.
 
 =head1 CONFIGURATION
 
-There are a few global variables that can be set to modify the
-behavior of this module.
+This module has a couple configuration settings that the caller
+may want to use to customize the behavior of this module.
 
-=over
+=head2 $Mail::DKIM::DNS::TIMEOUT
 
-=item $Mail::DKIM::DNS::TIMEOUT
+This global variable specifies the maximum amount of time (in seconds)
+to wait for a single DNS query to complete. The default is 10.
 
-This specifies the maximum amount of time (in seconds) to wait for
-a single DNS query to complete. The default is 10.
+=head2 Mail::DKIM::DNS::resolver()
 
-=item $Mail::DKIM::DNS::RESOLVER
+Use this global subroutine to get or replace the instance of
+L<Net::DNS::Resolver> that Mail::DKIM uses. If set to undef (the default),
+then a brand new default instance of L<Net::DNS::Resolver> will be
+created the first time a DNS query is needed.
 
-This specifies the instance of L<Net::DNS::Resolver> that is used
-to perform the queries. The default is undef, which causes a brand
-new default instance of L<Net::DNS::Resolver> to be created for each
-DNS query.
+You will call this subroutine if you want to specify non-default options
+to L<Net::DNS::Resolver>, such as different timeouts, or to enable use
+of a persistent socket. For example:
 
-Use this if you want to provide additional options to Net::DNS::Resolver,
-such as different timeouts or use of a persistent socket:
-
-  use Mail::DKIM::DNS;
-  $Mail::DKIM::DNS::RESOLVER = Net::DNS::Resolver->new(
+  # first, construct a custom DNS resolver
+  my $res = Net::DNS::Resolver->new(
                     udp_timeout => 3, tcp_timeout => 3, retry => 2,
                  );
-  $Mail::DKIM::DNS::RESOLVER->udppacketsize(4096);
-  $Mail::DKIM::DNS::RESOLVER->persistent_udp(1);
+  $res->udppacketsize(1240);
+  $res->persistent_udp(1);
 
-Note: to disable use of EDNS0 (enabled by default as of Mail::DKIM 0.40):
+  # then, tell Mail::DKIM to use this resolver
+  Mail::DKIM::DNS::resolver($res);
 
-  $Mail::DKIM::DNS::RESOLVER->udppacketsize(512);
+=head2 Mail::DKIM::DNS::enable_EDNS0()
 
-=back
+This is a convenience subroutine that will construct an appropriate DNS
+resolver that uses EDNS0 (Extension mechanisms for DNS) to support large
+DNS replies, and configure Mail::DKIM to use it. (As such, it should NOT
+be used in conjunction with the resolver() subroutine described above.)
+
+  Mail::DKIM::DNS::enable_EDNS0();
+
+Use of EDNS0 is recommended, since it reduces the need for falling back to TCP
+when dealing with large DNS packets. However, it is not enabled by default
+because some Internet firewalls which do deep inspection of packets are not able
+to process EDNS0-enabled packets. When there is a firewall on a path to a DNS
+resolver, the EDNS0 feature should be specifically tested before enabling.
 
 =cut
 
@@ -60,8 +69,28 @@ Note: to disable use of EDNS0 (enabled by default as of Mail::DKIM 0.40):
 package Mail::DKIM::DNS;
 use Net::DNS;
 our $TIMEOUT = 10;
-our $RESOLVER = Net::DNS::Resolver->new();
-$RESOLVER->udppacketsize(2048); # enables EDNS0, sets acceptable UDP packet size
+our $RESOLVER;
+
+sub resolver
+{
+	if (@_) {
+		$RESOLVER = $_[0];
+	}
+	return $RESOLVER;
+}
+
+sub enable_EDNS0
+{
+	# enable EDNS0, set acceptable UDP packet size to a
+	# conservative payload size that should fit into a single
+	# packet (MTU less the IP header size) in most cases;
+	# See also draft-andrews-dnsext-udp-fragmentation
+	# and RFC 3542 section 11.3.
+
+	my $res = Net::DNS::Resolver->new();
+	$res->udppacketsize(1280-40);
+	resolver($res);
+}
 
 # query- returns a list of RR objects
 #   or an empty list if the domain record does not exist
@@ -76,11 +105,13 @@ sub query
 {
 	my ($domain, $type) = @_;
 
-	my $rslv = $RESOLVER || Net::DNS::Resolver->new();
-	if (not $rslv)
+	if (! $RESOLVER)
 	{
-		die "can't create DNS resolver";
+		$RESOLVER = Net::DNS::Resolver->new();
+		$RESOLVER or die "can't create DNS resolver: $@";
 	}
+
+	my $rslv = $RESOLVER;
 
 	#
 	# perform the DNS query
@@ -89,24 +120,30 @@ sub query
 	my $resp;
 	my $remaining_time = alarm(0);  # check time left, stop the timer
 	my $deadline = time + $remaining_time;
+	my $E;
 	eval
 	{
-		# set a 10 second timeout
+		# set a timeout, 10 seconds by default
 		local $SIG{ALRM} = sub { die "DNS query timeout for $domain\n" };
 		alarm $TIMEOUT;
 
 		# the query itself could cause an exception, which would prevent
 		# us from resetting the alarm before leaving the eval {} block
 		# so we wrap the query in a nested eval {} block
+		my $E2;
 		eval
 		{
 			$resp = $rslv->send($domain, $type);
+			1;
+		} or do {
+			$E2 = $@;
 		};
-		my $E = $@;
 		alarm 0;
-		die $E if $E;
+		if ($E2) { chomp $E2; die "$E2\n" }  # no line number here
+		1;
+	} or do {
+		$E = $@;  # the $@ only makes sense if eval returns a false
 	};
-	my $E = $@;
 	alarm 0;
 	# restart the timer if it was active
 	if ($remaining_time > 0)
@@ -116,17 +153,37 @@ sub query
 		# even at the expense of stretching the interval by one second
 		alarm($dt < 1 ? 1 : $dt);
 	}
-	die $E if $E;
+	if ($E) { chomp $E; die $E }  # ensure a line number
+
+# RFC 2308: NODATA is indicated by an answer with the RCODE set to NOERROR
+# and no relevant answers in the answer section.  The authority section
+# will contain an SOA record, or there will be no NS records there.
+# NODATA responses have to be algorithmically determined from the
+# response's contents as there is no RCODE value to indicate NODATA.
+# In some cases to determine with certainty that NODATA is the correct
+# response it can be necessary to send another query.
 
 	if ($resp)
 	{
-		my @result = grep { lc $_->type eq lc $type } $resp->answer;
-		return @result if @result;
-	}
+		my $header = $resp->header;
+		if ($header)
+		{
+			# NOERROR, NXDOMAIN, SERVFAIL, FORMERR, REFUSED, ...
+			my $rcode = $header->rcode;
 
-	$@ = $rslv->errorstring;
-	return () if ($@ eq "NOERROR" || $@ eq "NXDOMAIN");
-	die "DNS error: $@\n";
+			$@ = $rcode;
+			if ($rcode eq 'NOERROR') {
+				# may or may not contain RRs in the answer sect
+				my @result = grep { lc $_->type eq lc $type }
+						  $resp->answer;
+				$@ = 'NODATA'  if !@result;
+				return @result;  # possibly empty
+			} elsif ($rcode eq 'NXDOMAIN') {
+				return;  # empty list, rcode in $@
+			}
+		}
+	}
+	die "DNS error: " . $rslv->errorstring . "\n";
 }
 
 # query_async() - perform a DNS query asynchronously
@@ -149,14 +206,15 @@ sub query_async
 
 	my $waiter = sub {
 		my @resp;
-		my $warning;
+		my $rcode;
 		eval {
 			@resp = query($domain, $type);
-			$warning = $@;
-			undef $@;
+			$rcode = $@;
+			1;
+		} or do {
+			return $on_error->($@);
 		};
-		$@ and return $on_error->($@);
-		$@ = $warning;
+		$@ = $rcode;
 		return $on_success->(@resp);
 	};
 	return $waiter;
@@ -170,7 +228,7 @@ Jason Long, E<lt>jlong@messiah.eduE<gt>
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2006-2007, 2012 by Messiah College
+Copyright (C) 2006-2007, 2012-2013 by Messiah College
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself, either Perl version 5.8.6 or,
