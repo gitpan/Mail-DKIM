@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:               Mail-DKIM
-version:            0.39_7
+version:            0.40
 abstract:           Signs/verifies Internet mail with DKIM/DomainKey signatures
 author:
     - Jason Long <jason@long.name>
